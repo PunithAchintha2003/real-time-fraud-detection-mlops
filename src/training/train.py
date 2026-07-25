@@ -1,6 +1,9 @@
 from pathlib import Path
 
 import joblib
+import mlflow
+import mlflow.sklearn
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -15,14 +18,27 @@ from sklearn.metrics import (
 from src.data.preprocessing import load_data, preprocess_data
 
 
-# Directory where trained models and preprocessing artifacts are stored
+# PROJECT CONFIGURATION
+
+# Directory where the best production model and scaler are stored
 MODELS_DIR = Path("models")
 
+# MLflow experiment name
+EXPERIMENT_NAME = "fraud-detection-model-comparison"
+
+
+# MODEL EVALUATION
 
 def evaluate_model(model, X_test, y_test, model_name):
     """
-    Evaluate a trained classification model using
-    precision, recall, F1 score, and ROC-AUC.
+    Evaluate a trained classification model using:
+    - Precision
+    - Recall
+    - F1 Score
+    - ROC-AUC
+
+    Returns:
+        dict: Model evaluation metrics.
     """
 
     # Generate class predictions
@@ -32,10 +48,28 @@ def evaluate_model(model, X_test, y_test, model_name):
     y_prob = model.predict_proba(X_test)[:, 1]
 
     # Calculate evaluation metrics
-    precision = precision_score(y_test, y_pred, zero_division=0)
-    recall = recall_score(y_test, y_pred, zero_division=0)
-    f1 = f1_score(y_test, y_pred, zero_division=0)
-    roc_auc = roc_auc_score(y_test, y_prob)
+    precision = precision_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    recall = recall_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    f1 = f1_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    roc_auc = roc_auc_score(
+        y_test,
+        y_prob
+    )
 
     # Display model evaluation results
     print("\n" + "=" * 50)
@@ -49,7 +83,13 @@ def evaluate_model(model, X_test, y_test, model_name):
 
     # Display detailed classification report
     print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, zero_division=0))
+    print(
+        classification_report(
+            y_test,
+            y_pred,
+            zero_division=0
+        )
+    )
 
     # Display confusion matrix
     print("Confusion Matrix:")
@@ -57,7 +97,6 @@ def evaluate_model(model, X_test, y_test, model_name):
 
     # Return metrics as a dictionary
     return {
-        "model_name": model_name,
         "precision": precision,
         "recall": recall,
         "f1_score": f1,
@@ -65,14 +104,27 @@ def evaluate_model(model, X_test, y_test, model_name):
     }
 
 
+# MAIN TRAINING PIPELINE
+
 def main():
 
-    print("=" * 50)
+    print("=" * 60)
     print("REAL-TIME FRAUD DETECTION")
-    print("MODEL TRAINING & COMPARISON PIPELINE")
-    print("=" * 50)
+    print("MLFLOW MODEL TRAINING & TRACKING PIPELINE")
+    print("=" * 60)
 
-    # STEP 1: LOAD DATASET
+    # STEP 1: CONFIGURE MLFLOW
+
+    print("\nConfiguring MLflow...")
+
+    # Set SQLite database as the MLflow tracking backend
+    # MLflow will store experiment metadata inside mlflow.db
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+
+    # Create or select the MLflow experiment
+    mlflow.set_experiment(EXPERIMENT_NAME)
+
+    # STEP 2: LOAD DATASET
 
     print("\nLoading dataset...")
 
@@ -81,7 +133,7 @@ def main():
 
     print("Dataset loaded successfully.")
 
-    # STEP 2: PREPROCESS DATA
+    # STEP 3: PREPROCESS DATA
 
     print("\nPreprocessing dataset...")
 
@@ -95,65 +147,147 @@ def main():
     print(f"\nTraining features shape : {X_train.shape}")
     print(f"Testing features shape  : {X_test.shape}")
 
-    # STEP 3: CREATE LOGISTIC REGRESSION MODEL
+    # STEP 4: TRAIN LOGISTIC REGRESSION
 
-    print("\n" + "-" * 50)
-    print("Training Logistic Regression model...")
-    print("-" * 50)
+    print("\n" + "-" * 60)
+    print("Training Logistic Regression model with MLflow...")
+    print("-" * 60)
 
-    # Create Logistic Regression baseline model
-    logistic_model = LogisticRegression(
-        max_iter=1000,
-        random_state=42
-    )
+    # Define Logistic Regression parameters
+    logistic_params = {
+        "model_type": "LogisticRegression",
+        "max_iter": 1000,
+        "random_state": 42,
+        "test_size": 0.2,
+    }
 
-    # Train Logistic Regression model
-    logistic_model.fit(X_train, y_train)
+    # Start an MLflow run for Logistic Regression
+    with mlflow.start_run(
+        run_name="logistic-regression"
+    ):
 
-    print("Logistic Regression training completed.")
+        # Create Logistic Regression model
+        logistic_model = LogisticRegression(
+            max_iter=1000,
+            random_state=42
+        )
 
-    # STEP 4: EVALUATE LOGISTIC REGRESSION
+        # Train the model
+        logistic_model.fit(
+            X_train,
+            y_train
+        )
 
-    logistic_results = evaluate_model(
-        logistic_model,
-        X_test,
-        y_test,
-        "Logistic Regression"
-    )
+        print(
+            "Logistic Regression training completed."
+        )
 
-    # STEP 5: CREATE RANDOM FOREST MODEL
+        # Evaluate the model
+        logistic_results = evaluate_model(
+            logistic_model,
+            X_test,
+            y_test,
+            "Logistic Regression"
+        )
 
-    print("\n" + "-" * 50)
-    print("Training Random Forest model...")
-    print("-" * 50)
+        # Log model parameters to MLflow
 
-    # Create Random Forest model
-    random_forest_model = RandomForestClassifier(
-        n_estimators=100,
-        random_state=42,
-        class_weight="balanced",
-        n_jobs=-1
-    )
+        mlflow.log_params(
+            logistic_params
+        )
 
-    # Train Random Forest model
-    random_forest_model.fit(X_train, y_train)
+        # Log evaluation metrics to MLflow
 
-    print("Random Forest training completed.")
+        mlflow.log_metrics(
+            logistic_results
+        )
 
-    # STEP 6: EVALUATE RANDOM FOREST
+        # Log trained model artifact to MLflow
 
-    random_forest_results = evaluate_model(
-        random_forest_model,
-        X_test,
-        y_test,
-        "Random Forest"
-    )
+        mlflow.sklearn.log_model(
+            logistic_model,
+            name="logistic-regression-model"
+        )
 
-    # STEP 7: COMPARE MODELS
+        print(
+            "\nLogistic Regression model logged to MLflow."
+        )
 
-    print("\n" + "=" * 50)
+    # STEP 5: TRAIN RANDOM FOREST
+
+    print("\n" + "-" * 60)
+    print("Training Random Forest model with MLflow...")
+    print("-" * 60)
+
+    # Define Random Forest parameters
+    random_forest_params = {
+        "model_type": "RandomForestClassifier",
+        "n_estimators": 100,
+        "random_state": 42,
+        "class_weight": "balanced",
+        "n_jobs": -1,
+        "test_size": 0.2,
+    }
+
+    # Start an MLflow run for Random Forest
+    with mlflow.start_run(
+        run_name="random-forest"
+    ):
+
+        # Create Random Forest model
+        random_forest_model = RandomForestClassifier(
+            n_estimators=100,
+            random_state=42,
+            class_weight="balanced",
+            n_jobs=-1
+        )
+
+        # Train the model
+        random_forest_model.fit(
+            X_train,
+            y_train
+        )
+
+        print(
+            "Random Forest training completed."
+        )
+
+        # Evaluate the model
+        random_forest_results = evaluate_model(
+            random_forest_model,
+            X_test,
+            y_test,
+            "Random Forest"
+        )
+
+        # Log model parameters to MLflow
+
+        mlflow.log_params(
+            random_forest_params
+        )
+
+        # Log evaluation metrics to MLflow
+
+        mlflow.log_metrics(
+            random_forest_results
+        )
+
+        # Log trained model artifact to MLflow
+
+        mlflow.sklearn.log_model(
+            random_forest_model,
+            name="random-forest-model"
+        )
+
+        print(
+            "\nRandom Forest model logged to MLflow."
+        )
+
+    # STEP 6: COMPARE MODELS
+
+    print("\n" + "=" * 60)
     print("MODEL COMPARISON")
-    print("=" * 50)
+    print("=" * 60)
 
     print(
         f"\n{'Metric':<15}"
@@ -187,64 +321,101 @@ def main():
         f"{random_forest_results['roc_auc']:<15.4f}"
     )
 
-    # STEP 8: SELECT BEST MODEL
+    # STEP 7: SELECT BEST MODEL
 
-    # For this baseline comparison, select the model
-    # with the highest F1 score.
-    # F1 score is useful here because the dataset is highly
-    # imbalanced and we want a balance between precision and recall.
+    # Select the model with the highest F1 score.
+    # F1 score is useful for this highly imbalanced dataset
+    # because it balances precision and recall.
 
-    if random_forest_results["f1_score"] > logistic_results["f1_score"]:
+    if (
+        random_forest_results["f1_score"]
+        > logistic_results["f1_score"]
+    ):
 
         best_model = random_forest_model
         best_results = random_forest_results
+        best_model_name = "Random Forest"
 
     else:
 
         best_model = logistic_model
         best_results = logistic_results
+        best_model_name = "Logistic Regression"
 
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 60)
     print("BEST MODEL")
-    print("=" * 50)
+    print("=" * 60)
 
-    print(f"Model     : {best_results['model_name']}")
-    print(f"Precision : {best_results['precision']:.4f}")
-    print(f"Recall    : {best_results['recall']:.4f}")
-    print(f"F1 Score  : {best_results['f1_score']:.4f}")
-    print(f"ROC-AUC   : {best_results['roc_auc']:.4f}")
+    print(f"Model     : {best_model_name}")
+    print(
+        f"Precision : {best_results['precision']:.4f}"
+    )
+    print(
+        f"Recall    : {best_results['recall']:.4f}"
+    )
+    print(
+        f"F1 Score  : {best_results['f1_score']:.4f}"
+    )
+    print(
+        f"ROC-AUC   : {best_results['roc_auc']:.4f}"
+    )
 
-    # STEP 9: CREATE MODELS DIRECTORY
+    # STEP 8: CREATE MODELS DIRECTORY
 
     # Create models directory if it does not already exist
-    MODELS_DIR.mkdir(exist_ok=True)
+    MODELS_DIR.mkdir(
+        exist_ok=True
+    )
 
-    # STEP 10: SAVE BEST MODEL
+    # STEP 9: SAVE BEST MODEL
 
     # Define the path for the production model artifact
-    model_path = MODELS_DIR / "fraud_detection_model.joblib"
+    model_path = (
+        MODELS_DIR
+        / "fraud_detection_model.joblib"
+    )
 
     # Save the selected best model
-    joblib.dump(best_model, model_path)
+    joblib.dump(
+        best_model,
+        model_path
+    )
 
-    # STEP 11: SAVE SCALER
+    # STEP 10: SAVE SCALER
 
-    # Define the path for the scaler artifact
-    scaler_path = MODELS_DIR / "scaler.joblib"
+    # Define the path for the fitted scaler
+    scaler_path = (
+        MODELS_DIR
+        / "scaler.joblib"
+    )
 
     # Save the fitted scaler
-    joblib.dump(scaler, scaler_path)
+    joblib.dump(
+        scaler,
+        scaler_path
+    )
 
-    # STEP 12: FINAL OUTPUT
+    # STEP 11: FINAL OUTPUT
 
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 60)
     print("MODEL ARTIFACTS SAVED")
-    print("=" * 50)
+    print("=" * 60)
 
-    print(f"Model path  : {model_path}")
-    print(f"Scaler path : {scaler_path}")
+    print(
+        f"Model path  : {model_path}"
+    )
 
-    print("\nTraining and model comparison pipeline completed successfully.")
+    print(
+        f"Scaler path : {scaler_path}"
+    )
+
+    print(
+        "\nMLflow experiment tracking completed successfully."
+    )
+
+    print(
+        "\nTraining and model comparison pipeline completed successfully."
+    )
 
 if __name__ == "__main__":
     main()
