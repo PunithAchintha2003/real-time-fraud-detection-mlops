@@ -1,37 +1,163 @@
+from pathlib import Path
+
 import pandas as pd
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+from src.config import (
+    DATA_PATH,
+    FEATURE_COLUMNS,
+    SCALED_FEATURES,
+)
 
-# Path to the credit card fraud dataset
-DATA_PATH = "data/creditcard.csv"
 
+# DATA LOADING
 
-def load_data():
-    """Load the credit card fraud dataset."""
+def load_data(
+    data_path: Path = DATA_PATH
+):
+    """
+    Load the credit card fraud detection dataset.
 
-    # Read the CSV dataset into a pandas DataFrame
-    df = pd.read_csv(DATA_PATH)
+    Args:
+        data_path:
+            Path to the CSV dataset.
+
+    Returns:
+        pandas.DataFrame:
+            Loaded dataset.
+    """
+
+    if not data_path.exists():
+        raise FileNotFoundError(
+            f"Dataset not found at: {data_path}"
+        )
+
+    df = pd.read_csv(
+        data_path
+    )
 
     return df
 
+
+# PREPROCESS FEATURES
+
+def preprocess_features(
+    X,
+    scaler,
+    fit_scaler=False
+):
+    """
+    Apply the same preprocessing used during training.
+
+    Only Time and Amount are scaled.
+
+    Args:
+        X:
+            Input feature DataFrame.
+
+        scaler:
+            StandardScaler instance.
+
+        fit_scaler:
+            If True, fit the scaler before transforming.
+            Use True only for training data.
+
+    Returns:
+        pandas.DataFrame:
+            Preprocessed feature DataFrame.
+    """
+
+    # Create a copy to avoid modifying the original DataFrame
+    X_processed = X.copy()
+
+    # Ensure the expected feature order
+    X_processed = X_processed[
+        FEATURE_COLUMNS
+    ]
+
+    # Fit scaler only during training
+    if fit_scaler:
+
+        X_processed[
+            SCALED_FEATURES
+        ] = scaler.fit_transform(
+            X_processed[
+                SCALED_FEATURES
+            ]
+        )
+
+    else:
+
+        X_processed[
+            SCALED_FEATURES
+        ] = scaler.transform(
+            X_processed[
+                SCALED_FEATURES
+            ]
+        )
+
+    return X_processed
+
+
+# TRAINING PREPROCESSING
 
 def preprocess_data(df):
     """
     Prepare the dataset for machine learning.
 
-    This function:
-    1. Separates features and target
-    2. Splits the dataset into training and testing sets
-    3. Scales the Time and Amount features
-    4. Returns the processed data and fitted scaler
+    Workflow:
+
+    1. Separate features and target.
+    2. Split into training and testing sets.
+    3. Fit scaler only on training data.
+    4. Transform training data.
+    5. Transform testing data using the same scaler.
+
+    Returns:
+        X_train
+        X_test
+        y_train
+        y_test
+        scaler
     """
 
-    # Separate input features from the target variable
-    X = df.drop("Class", axis=1)
+    # STEP 1: VALIDATE TARGET COLUMN
+
+    if "Class" not in df.columns:
+        raise ValueError(
+            "Dataset must contain a 'Class' target column."
+        )
+
+    # STEP 2: SEPARATE FEATURES AND TARGET
+
+    X = df.drop(
+        "Class",
+        axis=1
+    )
+
     y = df["Class"]
 
-    # Split the dataset into training and testing sets
+    # STEP 3: VALIDATE FEATURES
+
+    missing_features = [
+        feature
+        for feature in FEATURE_COLUMNS
+        if feature not in X.columns
+    ]
+
+    if missing_features:
+
+        raise ValueError(
+            "Missing required features: "
+            + ", ".join(
+                missing_features
+            )
+        )
+
+    # STEP 4: SPLIT DATA
+
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
@@ -40,84 +166,104 @@ def preprocess_data(df):
         stratify=y
     )
 
-    # Create a StandardScaler instance
+    # STEP 5: CREATE SCALER
+
     scaler = StandardScaler()
 
-    # Fit the scaler only on the training data
-    X_train[["Time", "Amount"]] = scaler.fit_transform(
-        X_train[["Time", "Amount"]]
+    # STEP 6: PREPROCESS TRAINING DATA
+
+    X_train = preprocess_features(
+        X_train,
+        scaler,
+        fit_scaler=True
     )
 
-    # Apply the already-fitted scaler to the test data
-    X_test[["Time", "Amount"]] = scaler.transform(
-        X_test[["Time", "Amount"]]
+    # STEP 7: PREPROCESS TEST DATA
+
+    X_test = preprocess_features(
+        X_test,
+        scaler,
+        fit_scaler=False
     )
 
-    # Return the processed training and testing datasets
-    return X_train, X_test, y_train, y_test, scaler
+    return (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        scaler
+    )
 
+
+# MAIN
 
 def main():
-    """Run the data exploration and preprocessing workflow."""
 
-    print("Loading dataset...")
+    print("=" * 60)
+    print("REAL-TIME FRAUD DETECTION")
+    print("DATA LOADING & PREPROCESSING")
+    print("=" * 60)
 
-    # Load the credit card fraud dataset
+    # Load dataset
+    print("\nLoading dataset...")
+
     df = load_data()
 
-    print("\nDataset loaded successfully.")
-
-    print("\nDataset Shape:")
-    print(df.shape)
-
-    print("\nFirst 5 Rows:")
-    print(df.head())
-
-    print("\nDataset Information:")
-    df.info()
-
-    print("\nMissing Values:")
-    print(df.isnull().sum())
-
-    print("\nData Types:")
-    print(df.dtypes)
-
-    print("\nClass Distribution:")
-    print(df["Class"].value_counts())
-
-    # Calculate the percentage distribution of each class
-    class_percentage = (
-        df["Class"].value_counts(normalize=True) * 100
+    print(
+        "Dataset loaded successfully."
     )
 
-    print("\nClass Distribution Percentage:")
-    print(class_percentage)
+    print(
+        f"\nDataset Shape: {df.shape}"
+    )
 
-    # Preprocess the dataset
-    X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
+    # Display dataset information
+    print("\nFirst 5 Rows:")
+    print(
+        df.head()
+    )
 
-    print("\nTraining Data Shape:")
-    print(X_train.shape)
+    print("\nMissing Values:")
+    print(
+        df.isnull().sum()
+    )
 
-    print("\nTesting Data Shape:")
-    print(X_test.shape)
+    print("\nClass Distribution:")
+    print(
+        df["Class"].value_counts()
+    )
 
-    print("\nTraining Target Distribution:")
-    print(y_train.value_counts())
+    # Preprocess dataset
+    print("\nPreprocessing dataset...")
 
-    print("\nTesting Target Distribution:")
-    print(y_test.value_counts())
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        scaler
+    ) = preprocess_data(df)
 
-    print("\nFeature Scaling:")
-    print("Time and Amount features scaled using StandardScaler.")
+    print(
+        "Data preprocessing completed successfully."
+    )
 
-    print("\nScaled Feature Sample:")
-    print(X_train[["Time", "Amount"]].head())
+    print(
+        f"\nTraining Features Shape: {X_train.shape}"
+    )
 
-    print("\nScaled Training Feature Statistics:")
-    print(X_train[["Time", "Amount"]].agg(["mean", "std"]))
+    print(
+        f"Testing Features Shape : {X_test.shape}"
+    )
 
-    print("\nData preprocessing completed successfully.")
+    print(
+        "\nScaled Features:"
+    )
+
+    print(
+        SCALED_FEATURES
+    )
+
 
 if __name__ == "__main__":
     main()

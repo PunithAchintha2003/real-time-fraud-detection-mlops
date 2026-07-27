@@ -1,8 +1,12 @@
+import pytest
+
 from src.inference.predict import (
     load_model,
     load_scaler,
     predict_transaction,
+    fraud_detection_service,
 )
+
 
 # SAMPLE TRANSACTION
 
@@ -39,6 +43,24 @@ SAMPLE_TRANSACTION = {
     "Amount": 149.62,
 }
 
+
+# LOAD INFERENCE SERVICE BEFORE TESTS
+
+@pytest.fixture(
+    scope="module",
+    autouse=True
+)
+def setup_inference_service():
+    """
+    Load the MLflow champion model and scaler
+    before running model inference tests.
+    """
+
+    if not fraud_detection_service.is_ready:
+
+        fraud_detection_service.load()
+
+
 # TEST MODEL LOADING
 
 def test_model_loading():
@@ -57,6 +79,7 @@ def test_model_loading():
         "predict_proba"
     )
 
+
 # TEST SCALER LOADING
 
 def test_scaler_loading():
@@ -69,6 +92,7 @@ def test_scaler_loading():
         scaler,
         "transform"
     )
+
 
 # TEST MODEL PREDICTION
 
@@ -86,6 +110,7 @@ def test_model_prediction():
 
     assert "is_fraud" in result
 
+
 # TEST PREDICTION VALUE
 
 def test_prediction_value():
@@ -95,9 +120,10 @@ def test_prediction_value():
     )
 
     assert result["prediction"] in [
-        "Fraud",
-        "Legitimate"
+        0,
+        1
     ]
+
 
 # TEST FRAUD PROBABILITY
 
@@ -113,6 +139,7 @@ def test_fraud_probability():
 
     assert 0 <= probability <= 1
 
+
 # TEST IS_FRAUD TYPE
 
 def test_is_fraud_type():
@@ -125,3 +152,43 @@ def test_is_fraud_type():
         result["is_fraud"],
         bool
     )
+
+
+# TEST THRESHOLD
+
+def test_threshold():
+
+    result = predict_transaction(
+        SAMPLE_TRANSACTION
+    )
+
+    assert "threshold" in result
+
+    assert result["threshold"] == 0.5
+
+
+# TEST MODEL SOURCE
+
+def test_model_source():
+
+    result = predict_transaction(
+        SAMPLE_TRANSACTION
+    )
+
+    assert "model_source" in result
+
+    assert result["model_source"] in [
+        "mlflow",
+        "local"
+    ]
+
+
+# TEST MODEL VERSION
+
+def test_model_version():
+
+    result = predict_transaction(
+        SAMPLE_TRANSACTION
+    )
+
+    assert "model_version" in result

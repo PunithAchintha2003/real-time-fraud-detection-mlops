@@ -1,59 +1,79 @@
-from pathlib import Path
+from contextlib import asynccontextmanager
 
-import joblib
-import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# PROJECT CONFIGURATION
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-MODEL_PATH = (
-    BASE_DIR
-    / "models"
-    / "fraud_detection_model.joblib"
+from src.config import (
+    FRAUD_THRESHOLD,
+    MLFLOW_MODEL_ALIAS,
+    MLFLOW_REGISTERED_MODEL_NAME,
+    FEATURE_COLUMNS,
 )
 
-SCALER_PATH = (
-    BASE_DIR
-    / "models"
-    / "scaler.joblib"
+from src.inference.predict import (
+    fraud_detection_service,
 )
+
+
+# APPLICATION LIFESPAN
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application startup and shutdown lifecycle.
+
+    The MLflow champion model and scaler are loaded
+    when the FastAPI application starts.
+    """
+
+    print(
+        "Starting Fraud Detection API..."
+    )
+
+    try:
+
+        fraud_detection_service.load()
+
+        print(
+            "Fraud Detection API startup completed."
+        )
+
+    except Exception as error:
+
+        print(
+            "ERROR: Failed to load "
+            f"fraud detection model: {error}"
+        )
+
+        # Keep the application running.
+        # Health endpoint will report unhealthy.
+        # Prediction endpoints will return HTTP 503.
+
+    yield
+
+    # SHUTDOWN
+
+    print(
+        "Shutting down Fraud Detection API..."
+    )
 
 
 # FASTAPI APPLICATION
 
 app = FastAPI(
     title="Real-Time Fraud Detection API",
+
     description=(
-        "Machine Learning API for credit card "
-        "fraud detection using Random Forest."
+        "Production-oriented machine learning API "
+        "for real-time credit card fraud detection "
+        "using MLflow Model Registry."
     ),
+
     version="1.0.0",
+
+    lifespan=lifespan,
 )
 
-# LOAD MODEL AND SCALER
-
-try:
-
-    model = joblib.load(MODEL_PATH)
-    scaler = joblib.load(SCALER_PATH)
-
-    print("Model loaded successfully.")
-    print(f"Model path: {MODEL_PATH}")
-
-    print("Scaler loaded successfully.")
-    print(f"Scaler path: {SCALER_PATH}")
-
-except Exception as error:
-
-    print(
-        f"Failed to load model or scaler: {error}"
-    )
-
-    model = None
-    scaler = None
 
 # REQUEST SCHEMA
 
@@ -61,13 +81,19 @@ class TransactionRequest(BaseModel):
     """
     Request schema for a credit card transaction.
 
-    The dataset contains 30 input features:
-    Time, V1-V28, and Amount.
+    The trained model expects exactly 30 features:
+
+    - Time
+    - V1 to V28
+    - Amount
     """
 
     Time: float = Field(
         ...,
-        description="Seconds elapsed between this transaction and the first transaction."
+        description=(
+            "Seconds elapsed between this transaction "
+            "and the first transaction."
+        )
     )
 
     V1: float
@@ -102,124 +128,196 @@ class TransactionRequest(BaseModel):
     Amount: float = Field(
         ...,
         ge=0,
-        description="Transaction amount."
+        description=(
+            "Credit card transaction amount. "
+            "Must be greater than or equal to 0."
+        )
     )
 
-# HEALTH CHECK ENDPOINT
 
-@app.get("/health")
+# HEALTH CHECK
+
+@app.get(
+    "/health",
+    tags=["Health"]
+)
 def health_check():
     """
     Check whether the API and ML model are ready.
     """
 
-    if model is None or scaler is None:
+    if not fraud_detection_service.is_ready:
 
         return {
             "status": "unhealthy",
+
             "model_loaded": False,
-            "message": "Model or scaler failed to load."
+
+            "model_source": (
+                fraud_detection_service.model_source
+            ),
+
+            "model_version": (
+                str(
+                    fraud_detection_service.model_version
+                )
+                if fraud_detection_service.model_version
+                is not None
+                else None
+            ),
+
+            "message": (
+                "Model or scaler is not available."
+            )
         }
 
     return {
         "status": "healthy",
+
         "model_loaded": True,
-        "message": "Fraud detection API is ready."
+
+        "model_source": (
+            fraud_detection_service.model_source
+        ),
+
+        "model_version": (
+            str(
+                fraud_detection_service.model_version
+            )
+            if fraud_detection_service.model_version
+            is not None
+            else None
+        ),
+
+        "message": (
+            "Fraud detection API is ready."
+        )
     }
 
-# MODEL INFORMATION ENDPOINT
 
-@app.get("/model-info")
+# MODEL INFORMATION
+
+@app.get(
+    "/model-info",
+    tags=["Model"]
+)
 def model_info():
     """
-    Return information about the currently loaded model.
+    Return information about the currently
+    loaded machine learning model.
     """
 
-    if model is None:
+    if not fraud_detection_service.is_ready:
 
         raise HTTPException(
             status_code=503,
-            detail="Model is not loaded."
+
+            detail=(
+                "Model is not loaded."
+            )
         )
 
     return {
-        "model_type": type(model).__name__,
-        "model_path": str(MODEL_PATH),
-        "scaler_path": str(SCALER_PATH),
-        "features": 30,
+        "registered_model": (
+            MLFLOW_REGISTERED_MODEL_NAME
+        ),
+
+        "model_alias": (
+            f"@{MLFLOW_MODEL_ALIAS}"
+        ),
+
+        "model_version": (
+            str(
+                fraud_detection_service.model_version
+            )
+            if fraud_detection_service.model_version
+            is not None
+            else None
+        ),
+
+        "model_type": (
+            type(
+                fraud_detection_service.model
+            ).__name__
+        ),
+
+        "model_source": (
+            fraud_detection_service.model_source
+        ),
+
+        "features": len(
+            FEATURE_COLUMNS
+        ),
+
+        "fraud_threshold": (
+            FRAUD_THRESHOLD
+        ),
+
         "status": "loaded"
     }
 
+
 # PREDICTION ENDPOINT
 
-@app.post("/predict")
+@app.post(
+    "/predict",
+    tags=["Prediction"]
+)
 def predict_transaction(
     transaction: TransactionRequest
 ):
     """
-    Predict whether a credit card transaction is fraudulent.
+    Predict whether a credit card transaction
+    is fraudulent or legitimate.
     """
 
-    if model is None or scaler is None:
+    # CHECK MODEL AVAILABILITY
+
+    if not fraud_detection_service.is_ready:
 
         raise HTTPException(
             status_code=503,
-            detail="Model or scaler is not available."
+
+            detail=(
+                "Fraud detection model is not available."
+            )
         )
 
     try:
 
-        # Convert request data into dictionary
-        transaction_data = transaction.model_dump()
+        # Convert Pydantic model to dictionary
 
-        # Convert dictionary into DataFrame
-        input_data = pd.DataFrame(
-            [transaction_data]
-        )
-
-        # Scale Time and Amount
-        input_data[["Time", "Amount"]] = (
-            scaler.transform(
-                input_data[["Time", "Amount"]]
-            )
+        transaction_data = (
+            transaction.model_dump()
         )
 
         # Generate prediction
-        prediction = model.predict(
-            input_data
-        )[0]
 
-        # Generate fraud probability
-        fraud_probability = model.predict_proba(
-            input_data
-        )[0][1]
-
-        # Convert prediction to integer
-        prediction = int(prediction)
-
-        # Convert probability to float
-        fraud_probability = float(
-            fraud_probability
+        result = (
+            fraud_detection_service.predict(
+                transaction_data
+            )
         )
 
-        # Return prediction response
-        return {
-            "prediction": prediction,
-            "is_fraud": bool(prediction == 1),
-            "fraud_probability": round(
-                fraud_probability,
-                4
-            ),
-            "result": (
-                "Fraudulent"
-                if prediction == 1
-                else "Legitimate"
+        return result
+
+    except ValueError as error:
+
+        raise HTTPException(
+            status_code=400,
+
+            detail=str(
+                error
             )
-        }
+        )
 
     except Exception as error:
 
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction failed: {str(error)}"
+
+            detail=(
+                "Prediction failed: "
+                f"{str(error)}"
+            )
         )
