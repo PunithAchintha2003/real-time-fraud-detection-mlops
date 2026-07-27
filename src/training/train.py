@@ -8,6 +8,7 @@ from mlflow import MlflowClient
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -17,47 +18,59 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-from src.data.preprocessing import load_data, preprocess_data
+from src.config import (
+    MLFLOW_TRACKING_URI,
+    MLFLOW_EXPERIMENT_NAME,
+    MLFLOW_REGISTERED_MODEL_NAME,
+    MLFLOW_MODEL_ALIAS,
+    MODELS_DIR,
+    MODEL_PATH,
+    SCALER_PATH,
+)
 
-# PROJECT CONFIGURATION
+from src.data.preprocessing import (
+    load_data,
+    preprocess_data,
+)
 
-# Directory where the best production model and scaler are stored
-MODELS_DIR = Path("models")
 
-# MLflow SQLite tracking database
-MLFLOW_TRACKING_URI = "sqlite:///mlflow.db"
+# MLFLOW CONFIGURATION
 
-# MLflow experiment name
-EXPERIMENT_NAME = "fraud-detection-model-comparison"
+mlflow.set_tracking_uri(
+    MLFLOW_TRACKING_URI
+)
 
-# MLflow registered model name
-REGISTERED_MODEL_NAME = "FraudDetectionModel"
-
-# Alias used to identify the current production candidate
-MODEL_ALIAS = "champion"
 
 # MODEL EVALUATION
 
-def evaluate_model(model, X_test, y_test, model_name):
+def evaluate_model(
+    model,
+    X_test,
+    y_test,
+    model_name
+):
     """
-    Evaluate a trained classification model using:
+    Evaluate a trained classification model.
+
+    Metrics:
 
     - Precision
     - Recall
     - F1 Score
     - ROC-AUC
-
-    Returns:
-        dict: Model evaluation metrics.
     """
 
-    # Generate class predictions
-    y_pred = model.predict(X_test)
+    # Generate predictions
+    y_pred = model.predict(
+        X_test
+    )
 
-    # Generate probability predictions for the positive class
-    y_prob = model.predict_proba(X_test)[:, 1]
+    # Generate probabilities
+    y_prob = model.predict_proba(
+        X_test
+    )[:, 1]
 
-    # Calculate evaluation metrics
+    # Calculate metrics
     precision = precision_score(
         y_test,
         y_pred,
@@ -81,18 +94,34 @@ def evaluate_model(model, X_test, y_test, model_name):
         y_prob
     )
 
-    # Display model evaluation results
+    # Display results
     print("\n" + "=" * 50)
-    print(f"{model_name.upper()} - EVALUATION RESULTS")
+
+    print(
+        f"{model_name.upper()} - EVALUATION RESULTS"
+    )
+
     print("=" * 50)
 
-    print(f"Precision : {precision:.4f}")
-    print(f"Recall    : {recall:.4f}")
-    print(f"F1 Score  : {f1:.4f}")
-    print(f"ROC-AUC   : {roc_auc:.4f}")
+    print(
+        f"Precision : {precision:.4f}"
+    )
 
-    # Display detailed classification report
-    print("\nClassification Report:")
+    print(
+        f"Recall    : {recall:.4f}"
+    )
+
+    print(
+        f"F1 Score  : {f1:.4f}"
+    )
+
+    print(
+        f"ROC-AUC   : {roc_auc:.4f}"
+    )
+
+    print(
+        "\nClassification Report:"
+    )
 
     print(
         classification_report(
@@ -102,8 +131,9 @@ def evaluate_model(model, X_test, y_test, model_name):
         )
     )
 
-    # Display confusion matrix
-    print("Confusion Matrix:")
+    print(
+        "Confusion Matrix:"
+    )
 
     print(
         confusion_matrix(
@@ -112,7 +142,6 @@ def evaluate_model(model, X_test, y_test, model_name):
         )
     )
 
-    # Return metrics as a dictionary
     return {
         "precision": precision,
         "recall": recall,
@@ -120,153 +149,168 @@ def evaluate_model(model, X_test, y_test, model_name):
         "roc_auc": roc_auc,
     }
 
-# REGISTER MODEL VERSION
+
+# REGISTER MODEL
 
 def register_model_version(
-    model,
     run_id,
     model_name,
     metrics
 ):
     """
-    Register a trained MLflow model and create a new model version.
-
-    Returns:
-        int: Registered model version number.
+    Register the MLflow model artifact from
+    the existing training run.
     """
 
     print("\n" + "-" * 60)
-    print(f"Registering {model_name} in MLflow Model Registry...")
+
+    print(
+        f"Registering {model_name} in MLflow Model Registry..."
+    )
+
     print("-" * 60)
 
-    # Create a temporary MLflow run context
-    # using the original training run ID.
-    with mlflow.start_run(
-        run_id=run_id
-    ):
+    # Create model URI pointing to the model artifact
+    model_uri = (
+        f"runs:/{run_id}/{model_name}"
+    )
 
-        # Log additional model registry metadata
-        mlflow.set_tag(
-            "registered_model",
-            REGISTERED_MODEL_NAME
+    # Register model from existing MLflow run
+    model_version = (
+        mlflow.register_model(
+            model_uri=model_uri,
+
+            name=MLFLOW_REGISTERED_MODEL_NAME
         )
+    )
 
-        mlflow.set_tag(
-            "model_selection_metric",
-            "f1_score"
-        )
-
-        # Log model to MLflow Model Registry
-        model_info = mlflow.sklearn.log_model(
-            model,
-            name=model_name,
-            registered_model_name=REGISTERED_MODEL_NAME
-        )
-
-    # Extract registered model version
-    version = model_info.registered_model_version
-
-    # Display registry information
-    print(
-        f"{model_name} registered successfully."
+    version = int(
+        model_version.version
     )
 
     print(
-        f"Registered Model : {REGISTERED_MODEL_NAME}"
+        "Model registered successfully."
     )
 
     print(
-        f"Model Version    : {version}"
+        f"Registered Model : "
+        f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
     print(
-        f"F1 Score         : {metrics['f1_score']:.4f}"
+        f"Model Version    : "
+        f"{version}"
     )
 
-    return int(version)
+    print(
+        f"F1 Score         : "
+        f"{metrics['f1_score']:.4f}"
+    )
 
-# SET MODEL ALIAS
+    return version
 
-def set_champion_alias(model_version):
+
+# SET CHAMPION ALIAS
+
+def set_champion_alias(
+    model_version
+):
     """
-    Assign the 'champion' alias to the selected best model version.
-
-    MLflow 3.x uses aliases instead of the older Production stage
-    workflow.
+    Assign the 'champion' alias to the selected
+    model version.
     """
 
     print("\n" + "-" * 60)
-    print("SETTING CHAMPION MODEL ALIAS")
+
+    print(
+        "SETTING CHAMPION MODEL ALIAS"
+    )
+
     print("-" * 60)
 
-    # Create MLflow client
     client = MlflowClient(
         tracking_uri=MLFLOW_TRACKING_URI
     )
 
-    # Assign champion alias to the selected model version
     client.set_registered_model_alias(
-        name=REGISTERED_MODEL_NAME,
-        alias=MODEL_ALIAS,
+        name=MLFLOW_REGISTERED_MODEL_NAME,
+
+        alias=MLFLOW_MODEL_ALIAS,
+
         version=model_version
     )
 
     print(
-        f"Registered Model : {REGISTERED_MODEL_NAME}"
+        f"Registered Model : "
+        f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
     print(
-        f"Alias            : @{MODEL_ALIAS}"
+        f"Alias            : "
+        f"@{MLFLOW_MODEL_ALIAS}"
     )
 
     print(
-        f"Version          : {model_version}"
+        f"Version          : "
+        f"{model_version}"
     )
 
     print(
         "\nChampion model updated successfully."
     )
 
+
 # MAIN TRAINING PIPELINE
 
 def main():
 
     print("=" * 60)
-    print("REAL-TIME FRAUD DETECTION")
-    print("MLFLOW TRAINING & MODEL REGISTRY PIPELINE")
+
+    print(
+        "REAL-TIME FRAUD DETECTION"
+    )
+
+    print(
+        "MLFLOW TRAINING & MODEL REGISTRY PIPELINE"
+    )
+
     print("=" * 60)
 
     # STEP 1: CONFIGURE MLFLOW
 
-    print("\nConfiguring MLflow...")
+    print(
+        "\nConfiguring MLflow..."
+    )
 
-    # Set SQLite database as MLflow tracking backend
     mlflow.set_tracking_uri(
         MLFLOW_TRACKING_URI
     )
 
-    # Create or select MLflow experiment
     mlflow.set_experiment(
-        EXPERIMENT_NAME
+        MLFLOW_EXPERIMENT_NAME
     )
 
     print(
-        f"MLflow tracking URI : {MLFLOW_TRACKING_URI}"
+        f"MLflow tracking URI : "
+        f"{MLFLOW_TRACKING_URI}"
     )
 
     print(
-        f"MLflow experiment   : {EXPERIMENT_NAME}"
+        f"MLflow experiment   : "
+        f"{MLFLOW_EXPERIMENT_NAME}"
     )
 
     print(
-        f"Registered model    : {REGISTERED_MODEL_NAME}"
+        f"Registered model    : "
+        f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
-    # STEP 2: LOAD DATASET
+    # STEP 2: LOAD DATA
 
-    print("\nLoading dataset...")
+    print(
+        "\nLoading dataset..."
+    )
 
-    # Load raw credit card fraud dataset
     df = load_data()
 
     print(
@@ -275,33 +319,45 @@ def main():
 
     # STEP 3: PREPROCESS DATA
 
-    print("\nPreprocessing dataset...")
+    print(
+        "\nPreprocessing dataset..."
+    )
 
-    # Split dataset and apply StandardScaler
-    X_train, X_test, y_train, y_test, scaler = preprocess_data(df)
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        scaler
+    ) = preprocess_data(
+        df
+    )
 
     print(
         "Data preprocessing completed successfully."
     )
 
-    # Display dataset shapes
     print(
-        f"\nTraining features shape : {X_train.shape}"
+        f"\nTraining features shape : "
+        f"{X_train.shape}"
     )
 
     print(
-        f"Testing features shape  : {X_test.shape}"
+        f"Testing features shape  : "
+        f"{X_test.shape}"
     )
+
 
     # STEP 4: TRAIN LOGISTIC REGRESSION
 
     print("\n" + "-" * 60)
+
     print(
         "Training Logistic Regression model with MLflow..."
     )
+
     print("-" * 60)
 
-    # Logistic Regression parameters
     logistic_params = {
         "model_type": "LogisticRegression",
         "max_iter": 1000,
@@ -309,18 +365,17 @@ def main():
         "test_size": 0.2,
     }
 
-    # Train Logistic Regression inside MLflow run
     with mlflow.start_run(
         run_name="logistic-regression"
     ) as logistic_run:
 
-        # Create model
-        logistic_model = LogisticRegression(
-            max_iter=1000,
-            random_state=42
+        logistic_model = (
+            LogisticRegression(
+                max_iter=1000,
+                random_state=42
+            )
         )
 
-        # Train model
         logistic_model.fit(
             X_train,
             y_train
@@ -330,7 +385,6 @@ def main():
             "Logistic Regression training completed."
         )
 
-        # Evaluate model
         logistic_results = evaluate_model(
             logistic_model,
             X_test,
@@ -338,17 +392,14 @@ def main():
             "Logistic Regression"
         )
 
-        # Log parameters
         mlflow.log_params(
             logistic_params
         )
 
-        # Log metrics
         mlflow.log_metrics(
             logistic_results
         )
 
-        # Add model metadata tags
         mlflow.set_tag(
             "model_type",
             "LogisticRegression"
@@ -359,14 +410,15 @@ def main():
             "model_comparison"
         )
 
-        # Log model artifact
+        # Log model artifact using a fixed artifact name
         mlflow.sklearn.log_model(
             logistic_model,
             name="logistic-regression-model"
         )
 
-        # Store MLflow run ID
-        logistic_run_id = logistic_run.info.run_id
+        logistic_run_id = (
+            logistic_run.info.run_id
+        )
 
         print(
             "\nLogistic Regression model logged to MLflow."
@@ -379,12 +431,13 @@ def main():
     # STEP 5: TRAIN RANDOM FOREST
 
     print("\n" + "-" * 60)
+
     print(
         "Training Random Forest model with MLflow..."
     )
+
     print("-" * 60)
 
-    # Random Forest parameters
     random_forest_params = {
         "model_type": "RandomForestClassifier",
         "n_estimators": 100,
@@ -394,20 +447,19 @@ def main():
         "test_size": 0.2,
     }
 
-    # Train Random Forest inside MLflow run
     with mlflow.start_run(
         run_name="random-forest"
     ) as random_forest_run:
 
-        # Create Random Forest model
-        random_forest_model = RandomForestClassifier(
-            n_estimators=100,
-            random_state=42,
-            class_weight="balanced",
-            n_jobs=-1
+        random_forest_model = (
+            RandomForestClassifier(
+                n_estimators=100,
+                random_state=42,
+                class_weight="balanced",
+                n_jobs=-1
+            )
         )
 
-        # Train model
         random_forest_model.fit(
             X_train,
             y_train
@@ -417,7 +469,6 @@ def main():
             "Random Forest training completed."
         )
 
-        # Evaluate model
         random_forest_results = evaluate_model(
             random_forest_model,
             X_test,
@@ -425,17 +476,14 @@ def main():
             "Random Forest"
         )
 
-        # Log parameters
         mlflow.log_params(
             random_forest_params
         )
 
-        # Log metrics
         mlflow.log_metrics(
             random_forest_results
         )
 
-        # Add model metadata tags
         mlflow.set_tag(
             "model_type",
             "RandomForestClassifier"
@@ -446,14 +494,14 @@ def main():
             "model_comparison"
         )
 
-        # Log model artifact
         mlflow.sklearn.log_model(
             random_forest_model,
             name="random-forest-model"
         )
 
-        # Store MLflow run ID
-        random_forest_run_id = random_forest_run.info.run_id
+        random_forest_run_id = (
+            random_forest_run.info.run_id
+        )
 
         print(
             "\nRandom Forest model logged to MLflow."
@@ -463,10 +511,14 @@ def main():
             f"Run ID : {random_forest_run_id}"
         )
 
-    # STEP 6: COMPARE MODELS
+    # STEP 6: MODEL COMPARISON
 
     print("\n" + "=" * 60)
-    print("MODEL COMPARISON")
+
+    print(
+        "MODEL COMPARISON"
+    )
+
     print("=" * 60)
 
     print(
@@ -475,7 +527,9 @@ def main():
         f"{'Random Forest':<15}"
     )
 
-    print("-" * 52)
+    print(
+        "-" * 52
+    )
 
     print(
         f"{'Precision':<15}"
@@ -503,26 +557,59 @@ def main():
 
     # STEP 7: SELECT BEST MODEL
 
-    # Select model with highest F1 score
     if (
         random_forest_results["f1_score"]
         > logistic_results["f1_score"]
     ):
 
-        best_model = random_forest_model
-        best_results = random_forest_results
-        best_model_name = "Random Forest"
-        best_run_id = random_forest_run_id
+        best_model = (
+            random_forest_model
+        )
+
+        best_results = (
+            random_forest_results
+        )
+
+        best_model_name = (
+            "Random Forest"
+        )
+
+        best_run_id = (
+            random_forest_run_id
+        )
+
+        best_artifact_name = (
+            "random-forest-model"
+        )
 
     else:
 
-        best_model = logistic_model
-        best_results = logistic_results
-        best_model_name = "Logistic Regression"
-        best_run_id = logistic_run_id
+        best_model = (
+            logistic_model
+        )
+
+        best_results = (
+            logistic_results
+        )
+
+        best_model_name = (
+            "Logistic Regression"
+        )
+
+        best_run_id = (
+            logistic_run_id
+        )
+
+        best_artifact_name = (
+            "logistic-regression-model"
+        )
 
     print("\n" + "=" * 60)
-    print("BEST MODEL")
+
+    print(
+        "BEST MODEL"
+    )
+
     print("=" * 60)
 
     print(
@@ -530,19 +617,23 @@ def main():
     )
 
     print(
-        f"Precision : {best_results['precision']:.4f}"
+        f"Precision : "
+        f"{best_results['precision']:.4f}"
     )
 
     print(
-        f"Recall    : {best_results['recall']:.4f}"
+        f"Recall    : "
+        f"{best_results['recall']:.4f}"
     )
 
     print(
-        f"F1 Score  : {best_results['f1_score']:.4f}"
+        f"F1 Score  : "
+        f"{best_results['f1_score']:.4f}"
     )
 
     print(
-        f"ROC-AUC   : {best_results['roc_auc']:.4f}"
+        f"ROC-AUC   : "
+        f"{best_results['roc_auc']:.4f}"
     )
 
     print(
@@ -551,11 +642,14 @@ def main():
 
     # STEP 8: REGISTER BEST MODEL
 
-    best_model_version = register_model_version(
-        model=best_model,
-        run_id=best_run_id,
-        model_name="production-model",
-        metrics=best_results
+    best_model_version = (
+        register_model_version(
+            run_id=best_run_id,
+
+            model_name=best_artifact_name,
+
+            metrics=best_results
+        )
     )
 
     # STEP 9: SET CHAMPION ALIAS
@@ -566,71 +660,67 @@ def main():
 
     # STEP 10: CREATE MODELS DIRECTORY
 
-    # Create models directory if it does not exist
     MODELS_DIR.mkdir(
         exist_ok=True
     )
 
     # STEP 11: SAVE BEST MODEL LOCALLY
 
-    # Define production model path
-    model_path = (
-        MODELS_DIR
-        / "fraud_detection_model.joblib"
-    )
-
-    # Save selected best model
     joblib.dump(
         best_model,
-        model_path
+        MODEL_PATH
     )
 
     # STEP 12: SAVE SCALER
 
-    # Define scaler path
-    scaler_path = (
-        MODELS_DIR
-        / "scaler.joblib"
-    )
-
-    # Save fitted scaler
     joblib.dump(
         scaler,
-        scaler_path
+        SCALER_PATH
     )
 
     # STEP 13: FINAL OUTPUT
 
     print("\n" + "=" * 60)
-    print("MODEL REGISTRY PIPELINE COMPLETED")
+
+    print(
+        "MODEL REGISTRY PIPELINE COMPLETED"
+    )
+
     print("=" * 60)
 
     print(
-        f"Registered Model : {REGISTERED_MODEL_NAME}"
+        f"Registered Model : "
+        f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
     print(
-        f"Model Version    : {best_model_version}"
+        f"Model Version    : "
+        f"{best_model_version}"
     )
 
     print(
-        f"Model Alias      : @{MODEL_ALIAS}"
+        f"Model Alias      : "
+        f"@{MLFLOW_MODEL_ALIAS}"
     )
 
     print(
-        f"Best Model       : {best_model_name}"
+        f"Best Model       : "
+        f"{best_model_name}"
     )
 
     print(
-        f"F1 Score         : {best_results['f1_score']:.4f}"
+        f"F1 Score         : "
+        f"{best_results['f1_score']:.4f}"
     )
 
     print(
-        f"Model path       : {model_path}"
+        f"Model path       : "
+        f"{MODEL_PATH}"
     )
 
     print(
-        f"Scaler path      : {scaler_path}"
+        f"Scaler path      : "
+        f"{SCALER_PATH}"
     )
 
     print(
@@ -646,8 +736,10 @@ def main():
     )
 
     print(
-        "\nTraining and model registry pipeline completed successfully."
+        "\nTraining and model registry pipeline "
+        "completed successfully."
     )
+
 
 if __name__ == "__main__":
     main()
