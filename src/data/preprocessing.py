@@ -30,6 +30,7 @@ def load_data(
     """
 
     if not data_path.exists():
+
         raise FileNotFoundError(
             f"Dataset not found at: {data_path}"
         )
@@ -61,18 +62,18 @@ def preprocess_features(
             StandardScaler instance.
 
         fit_scaler:
-            If True, fit the scaler before transforming.
-            Use True only for training data.
+            If True, fit scaler before transforming.
+            Use True only during training.
 
     Returns:
         pandas.DataFrame:
             Preprocessed feature DataFrame.
     """
 
-    # Create a copy to avoid modifying the original DataFrame
+    # Create a copy to avoid modifying original data
     X_processed = X.copy()
 
-    # Ensure the expected feature order
+    # Ensure correct feature order
     X_processed = X_processed[
         FEATURE_COLUMNS
     ]
@@ -113,7 +114,7 @@ def preprocess_data(df):
     2. Split into training and testing sets.
     3. Fit scaler only on training data.
     4. Transform training data.
-    5. Transform testing data using the same scaler.
+    5. Transform testing data using same scaler.
 
     Returns:
         X_train
@@ -126,6 +127,7 @@ def preprocess_data(df):
     # STEP 1: VALIDATE TARGET COLUMN
 
     if "Class" not in df.columns:
+
         raise ValueError(
             "Dataset must contain a 'Class' target column."
         )
@@ -204,8 +206,11 @@ def main():
     print("DATA LOADING & PREPROCESSING")
     print("=" * 60)
 
-    # Load dataset
-    print("\nLoading dataset...")
+    # LOAD DATASET
+
+    print(
+        "\nLoading dataset..."
+    )
 
     df = load_data()
 
@@ -217,24 +222,37 @@ def main():
         f"\nDataset Shape: {df.shape}"
     )
 
-    # Display dataset information
-    print("\nFirst 5 Rows:")
+    # DISPLAY DATASET INFORMATION
+
+    print(
+        "\nFirst 5 Rows:"
+    )
+
     print(
         df.head()
     )
 
-    print("\nMissing Values:")
+    print(
+        "\nMissing Values:"
+    )
+
     print(
         df.isnull().sum()
     )
 
-    print("\nClass Distribution:")
+    print(
+        "\nClass Distribution:"
+    )
+
     print(
         df["Class"].value_counts()
     )
 
-    # Preprocess dataset
-    print("\nPreprocessing dataset...")
+    # PREPROCESS DATASET
+
+    print(
+        "\nPreprocessing dataset..."
+    )
 
     (
         X_train,
@@ -265,5 +283,8 @@ def main():
     )
 
 
+# APPLICATION ENTRY POINT
+
 if __name__ == "__main__":
+
     main()

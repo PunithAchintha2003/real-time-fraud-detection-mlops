@@ -1,4 +1,4 @@
-from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 import joblib
 import mlflow
@@ -47,61 +47,68 @@ def evaluate_model(
     model,
     X_test,
     y_test,
-    model_name
+    model_name,
 ):
     """
     Evaluate a trained classification model.
 
     Metrics:
-
-    - Precision
-    - Recall
-    - F1 Score
-    - ROC-AUC
+        - Precision
+        - Recall
+        - F1 Score
+        - ROC-AUC
     """
 
-    # Generate predictions
+    # GENERATE PREDICTIONS
+
     y_pred = model.predict(
         X_test
     )
 
-    # Generate probabilities
+    # GENERATE FRAUD PROBABILITIES
+
     y_prob = model.predict_proba(
         X_test
     )[:, 1]
 
-    # Calculate metrics
+    # CALCULATE METRICS
+
     precision = precision_score(
         y_test,
         y_pred,
-        zero_division=0
+        zero_division=0,
     )
 
     recall = recall_score(
         y_test,
         y_pred,
-        zero_division=0
+        zero_division=0,
     )
 
     f1 = f1_score(
         y_test,
         y_pred,
-        zero_division=0
+        zero_division=0,
     )
 
     roc_auc = roc_auc_score(
         y_test,
-        y_prob
+        y_prob,
     )
 
-    # Display results
-    print("\n" + "=" * 50)
+    # DISPLAY RESULTS
+
+    print(
+        "\n" + "=" * 60
+    )
 
     print(
         f"{model_name.upper()} - EVALUATION RESULTS"
     )
 
-    print("=" * 50)
+    print(
+        "=" * 60
+    )
 
     print(
         f"Precision : {precision:.4f}"
@@ -127,7 +134,7 @@ def evaluate_model(
         classification_report(
             y_test,
             y_pred,
-            zero_division=0
+            zero_division=0,
         )
     )
 
@@ -138,7 +145,7 @@ def evaluate_model(
     print(
         confusion_matrix(
             y_test,
-            y_pred
+            y_pred,
         )
     )
 
@@ -153,34 +160,65 @@ def evaluate_model(
 # REGISTER MODEL
 
 def register_model_version(
-    run_id,
-    model_name,
-    metrics
+    run_id: str,
+    logged_model_id: str,
+    metrics: Dict[str, float],
 ):
     """
-    Register the MLflow model artifact from
-    the existing training run.
+    Register the selected MLflow Logged Model
+    in the MLflow Model Registry.
+
+    MLflow 3.x compatible approach.
+
+    Uses the Logged Model ID directly instead of
+    searching artifacts with search_logged_models().
     """
 
-    print("\n" + "-" * 60)
+    print(
+        "\n" + "=" * 60
+    )
 
     print(
-        f"Registering {model_name} in MLflow Model Registry..."
+        "REGISTERING MODEL IN MLFLOW MODEL REGISTRY"
     )
 
-    print("-" * 60)
+    print(
+        "=" * 60
+    )
 
-    # Create model URI pointing to the model artifact
+    print(
+        f"\nRun ID              : {run_id}"
+    )
+
+    print(
+        f"Logged Model ID     : {logged_model_id}"
+    )
+
+    print(
+        f"Registered Model    : "
+        f"{MLFLOW_REGISTERED_MODEL_NAME}"
+    )
+
+    # CREATE MODEL URI USING LOGGED MODEL ID
+
     model_uri = (
-        f"runs:/{run_id}/{model_name}"
+        f"models:/{logged_model_id}"
     )
 
-    # Register model from existing MLflow run
+    print(
+        f"Model URI           : {model_uri}"
+    )
+
+    # REGISTER LOGGED MODEL
+
+    print(
+        "\nRegistering MLflow Logged Model..."
+    )
+
     model_version = (
         mlflow.register_model(
             model_uri=model_uri,
-
-            name=MLFLOW_REGISTERED_MODEL_NAME
+            name=MLFLOW_REGISTERED_MODEL_NAME,
         )
     )
 
@@ -188,22 +226,29 @@ def register_model_version(
         model_version.version
     )
 
+    # DISPLAY REGISTRATION RESULT
+
     print(
-        "Model registered successfully."
+        "\nModel registered successfully."
     )
 
     print(
-        f"Registered Model : "
+        f"Registered Model    : "
         f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
     print(
-        f"Model Version    : "
+        f"Model Version       : "
         f"{version}"
     )
 
     print(
-        f"F1 Score         : "
+        f"Logged Model ID     : "
+        f"{logged_model_id}"
+    )
+
+    print(
+        f"F1 Score            : "
         f"{metrics['f1_score']:.4f}"
     )
 
@@ -213,35 +258,41 @@ def register_model_version(
 # SET CHAMPION ALIAS
 
 def set_champion_alias(
-    model_version
+    model_version: int,
 ):
     """
     Assign the 'champion' alias to the selected
     model version.
     """
 
-    print("\n" + "-" * 60)
+    print(
+        "\n" + "=" * 60
+    )
 
     print(
         "SETTING CHAMPION MODEL ALIAS"
     )
 
-    print("-" * 60)
+    print(
+        "=" * 60
+    )
 
     client = MlflowClient(
         tracking_uri=MLFLOW_TRACKING_URI
     )
 
+    # SET ALIAS
+
     client.set_registered_model_alias(
         name=MLFLOW_REGISTERED_MODEL_NAME,
-
         alias=MLFLOW_MODEL_ALIAS,
-
-        version=model_version
+        version=model_version,
     )
 
+    # DISPLAY RESULT
+
     print(
-        f"Registered Model : "
+        f"\nRegistered Model : "
         f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
@@ -260,11 +311,313 @@ def set_champion_alias(
     )
 
 
+# TRAIN LOGISTIC REGRESSION
+
+def train_logistic_regression(
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+):
+    """
+    Train and log Logistic Regression model.
+
+    Returns:
+        model
+        evaluation results
+        run ID
+        logged model ID
+    """
+
+    print(
+        "\n" + "-" * 60
+    )
+
+    print(
+        "TRAINING LOGISTIC REGRESSION"
+    )
+
+    print(
+        "-" * 60
+    )
+
+    params = {
+        "model_type": "LogisticRegression",
+        "max_iter": 1000,
+        "random_state": 42,
+        "test_size": 0.2,
+    }
+
+    with mlflow.start_run(
+        run_name="logistic-regression"
+    ) as run:
+
+        # CREATE MODEL
+
+        model = LogisticRegression(
+            max_iter=1000,
+            random_state=42,
+        )
+
+        # TRAIN MODEL
+
+        model.fit(
+            X_train,
+            y_train,
+        )
+
+        print(
+            "Logistic Regression training completed."
+        )
+
+        # EVALUATE MODEL
+
+        results = evaluate_model(
+            model,
+            X_test,
+            y_test,
+            "Logistic Regression",
+        )
+
+        # LOG PARAMETERS
+
+        mlflow.log_params(
+            params
+        )
+
+        # LOG METRICS
+
+        mlflow.log_metrics(
+            results
+        )
+
+        # LOG METADATA
+
+        mlflow.set_tag(
+            "model_type",
+            "LogisticRegression",
+        )
+
+        mlflow.set_tag(
+            "training_stage",
+            "model_comparison",
+        )
+
+        mlflow.set_tag(
+            "framework",
+            "scikit-learn",
+        )
+
+        # LOG MODEL
+        #
+        # MLflow 3.x:
+        # Use name instead of deprecated artifact_path.
+
+        logged_model = (
+            mlflow.sklearn.log_model(
+                sk_model=model,
+                name="logistic-regression-model",
+            )
+        )
+
+        # GET RUN ID
+
+        run_id = (
+            run.info.run_id
+        )
+
+        # GET LOGGED MODEL ID
+
+        logged_model_id = (
+            logged_model.model_id
+        )
+
+        # DISPLAY RESULT
+
+        print(
+            "\nLogistic Regression model logged successfully."
+        )
+
+        print(
+            f"Run ID            : {run_id}"
+        )
+
+        print(
+            f"Logged Model ID   : {logged_model_id}"
+        )
+
+        print(
+            "Logged Model Name : "
+            "logistic-regression-model"
+        )
+
+    return (
+        model,
+        results,
+        run_id,
+        logged_model_id,
+    )
+
+
+# TRAIN RANDOM FOREST
+
+def train_random_forest(
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+):
+    """
+    Train and log Random Forest model.
+
+    Returns:
+        model
+        evaluation results
+        run ID
+        logged model ID
+    """
+
+    print(
+        "\n" + "-" * 60
+    )
+
+    print(
+        "TRAINING RANDOM FOREST"
+    )
+
+    print(
+        "-" * 60
+    )
+
+    params = {
+        "model_type": "RandomForestClassifier",
+        "n_estimators": 100,
+        "random_state": 42,
+        "class_weight": "balanced",
+        "n_jobs": -1,
+        "test_size": 0.2,
+    }
+
+    with mlflow.start_run(
+        run_name="random-forest"
+    ) as run:
+
+        # CREATE MODEL
+
+        model = RandomForestClassifier(
+            n_estimators=100,
+            random_state=42,
+            class_weight="balanced",
+            n_jobs=-1,
+        )
+
+        # TRAIN MODEL
+
+        model.fit(
+            X_train,
+            y_train,
+        )
+
+        print(
+            "Random Forest training completed."
+        )
+
+        # EVALUATE MODEL
+
+        results = evaluate_model(
+            model,
+            X_test,
+            y_test,
+            "Random Forest",
+        )
+
+        # LOG PARAMETERS
+
+        mlflow.log_params(
+            params
+        )
+
+        # LOG METRICS
+
+        mlflow.log_metrics(
+            results
+        )
+
+        # LOG METADATA
+
+        mlflow.set_tag(
+            "model_type",
+            "RandomForestClassifier",
+        )
+
+        mlflow.set_tag(
+            "training_stage",
+            "model_comparison",
+        )
+
+        mlflow.set_tag(
+            "framework",
+            "scikit-learn",
+        )
+
+        # LOG MODEL
+        #
+        # MLflow 3.x:
+        # Use name instead of deprecated artifact_path.
+
+        logged_model = (
+            mlflow.sklearn.log_model(
+                sk_model=model,
+                name="random-forest-model",
+            )
+        )
+
+        # GET RUN ID
+
+        run_id = (
+            run.info.run_id
+        )
+
+        # GET LOGGED MODEL ID
+
+        logged_model_id = (
+            logged_model.model_id
+        )
+
+        # DISPLAY RESULT
+
+        print(
+            "\nRandom Forest model logged successfully."
+        )
+
+        print(
+            f"Run ID            : {run_id}"
+        )
+
+        print(
+            f"Logged Model ID   : {logged_model_id}"
+        )
+
+        print(
+            "Logged Model Name : "
+            "random-forest-model"
+        )
+
+    return (
+        model,
+        results,
+        run_id,
+        logged_model_id,
+    )
+
+
 # MAIN TRAINING PIPELINE
 
 def main():
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     print(
         "REAL-TIME FRAUD DETECTION"
@@ -274,7 +627,9 @@ def main():
         "MLFLOW TRAINING & MODEL REGISTRY PIPELINE"
     )
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     # STEP 1: CONFIGURE MLFLOW
 
@@ -305,6 +660,11 @@ def main():
         f"{MLFLOW_REGISTERED_MODEL_NAME}"
     )
 
+    print(
+        f"Champion alias      : "
+        f"@{MLFLOW_MODEL_ALIAS}"
+    )
+
     # STEP 2: LOAD DATA
 
     print(
@@ -315,6 +675,10 @@ def main():
 
     print(
         "Dataset loaded successfully."
+    )
+
+    print(
+        f"Dataset shape: {df.shape}"
     )
 
     # STEP 3: PREPROCESS DATA
@@ -328,7 +692,7 @@ def main():
         X_test,
         y_train,
         y_test,
-        scaler
+        scaler,
     ) = preprocess_data(
         df
     )
@@ -338,7 +702,7 @@ def main():
     )
 
     print(
-        f"\nTraining features shape : "
+        f"Training features shape : "
         f"{X_train.shape}"
     )
 
@@ -347,179 +711,47 @@ def main():
         f"{X_test.shape}"
     )
 
-
     # STEP 4: TRAIN LOGISTIC REGRESSION
 
-    print("\n" + "-" * 60)
-
-    print(
-        "Training Logistic Regression model with MLflow..."
+    (
+        logistic_model,
+        logistic_results,
+        logistic_run_id,
+        logistic_logged_model_id,
+    ) = train_logistic_regression(
+        X_train,
+        X_test,
+        y_train,
+        y_test,
     )
-
-    print("-" * 60)
-
-    logistic_params = {
-        "model_type": "LogisticRegression",
-        "max_iter": 1000,
-        "random_state": 42,
-        "test_size": 0.2,
-    }
-
-    with mlflow.start_run(
-        run_name="logistic-regression"
-    ) as logistic_run:
-
-        logistic_model = (
-            LogisticRegression(
-                max_iter=1000,
-                random_state=42
-            )
-        )
-
-        logistic_model.fit(
-            X_train,
-            y_train
-        )
-
-        print(
-            "Logistic Regression training completed."
-        )
-
-        logistic_results = evaluate_model(
-            logistic_model,
-            X_test,
-            y_test,
-            "Logistic Regression"
-        )
-
-        mlflow.log_params(
-            logistic_params
-        )
-
-        mlflow.log_metrics(
-            logistic_results
-        )
-
-        mlflow.set_tag(
-            "model_type",
-            "LogisticRegression"
-        )
-
-        mlflow.set_tag(
-            "training_stage",
-            "model_comparison"
-        )
-
-        # Log model artifact using a fixed artifact name
-        mlflow.sklearn.log_model(
-            logistic_model,
-            name="logistic-regression-model"
-        )
-
-        logistic_run_id = (
-            logistic_run.info.run_id
-        )
-
-        print(
-            "\nLogistic Regression model logged to MLflow."
-        )
-
-        print(
-            f"Run ID : {logistic_run_id}"
-        )
 
     # STEP 5: TRAIN RANDOM FOREST
 
-    print("\n" + "-" * 60)
-
-    print(
-        "Training Random Forest model with MLflow..."
+    (
+        random_forest_model,
+        random_forest_results,
+        random_forest_run_id,
+        random_forest_logged_model_id,
+    ) = train_random_forest(
+        X_train,
+        X_test,
+        y_train,
+        y_test,
     )
-
-    print("-" * 60)
-
-    random_forest_params = {
-        "model_type": "RandomForestClassifier",
-        "n_estimators": 100,
-        "random_state": 42,
-        "class_weight": "balanced",
-        "n_jobs": -1,
-        "test_size": 0.2,
-    }
-
-    with mlflow.start_run(
-        run_name="random-forest"
-    ) as random_forest_run:
-
-        random_forest_model = (
-            RandomForestClassifier(
-                n_estimators=100,
-                random_state=42,
-                class_weight="balanced",
-                n_jobs=-1
-            )
-        )
-
-        random_forest_model.fit(
-            X_train,
-            y_train
-        )
-
-        print(
-            "Random Forest training completed."
-        )
-
-        random_forest_results = evaluate_model(
-            random_forest_model,
-            X_test,
-            y_test,
-            "Random Forest"
-        )
-
-        mlflow.log_params(
-            random_forest_params
-        )
-
-        mlflow.log_metrics(
-            random_forest_results
-        )
-
-        mlflow.set_tag(
-            "model_type",
-            "RandomForestClassifier"
-        )
-
-        mlflow.set_tag(
-            "training_stage",
-            "model_comparison"
-        )
-
-        mlflow.sklearn.log_model(
-            random_forest_model,
-            name="random-forest-model"
-        )
-
-        random_forest_run_id = (
-            random_forest_run.info.run_id
-        )
-
-        print(
-            "\nRandom Forest model logged to MLflow."
-        )
-
-        print(
-            f"Run ID : {random_forest_run_id}"
-        )
 
     # STEP 6: MODEL COMPARISON
 
-    print("\n" + "=" * 60)
+    print(
+        "\n" + "=" * 60
+    )
 
     print(
         "MODEL COMPARISON"
     )
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     print(
         f"\n{'Metric':<15}"
@@ -578,8 +810,8 @@ def main():
             random_forest_run_id
         )
 
-        best_artifact_name = (
-            "random-forest-model"
+        best_logged_model_id = (
+            random_forest_logged_model_id
         )
 
     else:
@@ -600,17 +832,23 @@ def main():
             logistic_run_id
         )
 
-        best_artifact_name = (
-            "logistic-regression-model"
+        best_logged_model_id = (
+            logistic_logged_model_id
         )
 
-    print("\n" + "=" * 60)
+    # DISPLAY BEST MODEL
 
     print(
-        "BEST MODEL"
+        "\n" + "=" * 60
     )
 
-    print("=" * 60)
+    print(
+        "BEST MODEL SELECTED"
+    )
+
+    print(
+        "=" * 60
+    )
 
     print(
         f"Model     : {best_model_name}"
@@ -640,15 +878,18 @@ def main():
         f"Run ID    : {best_run_id}"
     )
 
+    print(
+        f"Logged Model ID : "
+        f"{best_logged_model_id}"
+    )
+
     # STEP 8: REGISTER BEST MODEL
 
     best_model_version = (
         register_model_version(
             run_id=best_run_id,
-
-            model_name=best_artifact_name,
-
-            metrics=best_results
+            logged_model_id=best_logged_model_id,
+            metrics=best_results,
         )
     )
 
@@ -658,35 +899,50 @@ def main():
         best_model_version
     )
 
-    # STEP 10: CREATE MODELS DIRECTORY
+    # STEP 10: CREATE LOCAL MODELS DIRECTORY
 
     MODELS_DIR.mkdir(
-        exist_ok=True
+        parents=True,
+        exist_ok=True,
     )
 
     # STEP 11: SAVE BEST MODEL LOCALLY
 
     joblib.dump(
         best_model,
-        MODEL_PATH
+        MODEL_PATH,
+    )
+
+    print(
+        f"\nLocal model saved to:"
+        f"\n{MODEL_PATH}"
     )
 
     # STEP 12: SAVE SCALER
 
     joblib.dump(
         scaler,
-        SCALER_PATH
+        SCALER_PATH,
+    )
+
+    print(
+        f"Scaler saved to:"
+        f"\n{SCALER_PATH}"
     )
 
     # STEP 13: FINAL OUTPUT
 
-    print("\n" + "=" * 60)
+    print(
+        "\n" + "=" * 60
+    )
 
     print(
         "MODEL REGISTRY PIPELINE COMPLETED"
     )
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     print(
         f"Registered Model : "
@@ -741,5 +997,8 @@ def main():
     )
 
 
+# RUN TRAINING PIPELINE
+
 if __name__ == "__main__":
+
     main()

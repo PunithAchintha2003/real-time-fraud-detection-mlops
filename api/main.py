@@ -19,12 +19,6 @@ from src.inference.predict import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application startup and shutdown lifecycle.
-
-    The MLflow champion model and scaler are loaded
-    when the FastAPI application starts.
-    """
 
     print(
         "Starting Fraud Detection API..."
@@ -45,13 +39,11 @@ async def lifespan(app: FastAPI):
             f"fraud detection model: {error}"
         )
 
-        # Keep the application running.
-        # Health endpoint will report unhealthy.
-        # Prediction endpoints will return HTTP 503.
+        # Keep API running.
+        # /health reports unhealthy.
+        # /predict and /model-info return 503.
 
     yield
-
-    # SHUTDOWN
 
     print(
         "Shutting down Fraud Detection API..."
@@ -61,6 +53,7 @@ async def lifespan(app: FastAPI):
 # FASTAPI APPLICATION
 
 app = FastAPI(
+
     title="Real-Time Fraud Detection API",
 
     description=(
@@ -79,7 +72,7 @@ app = FastAPI(
 
 class TransactionRequest(BaseModel):
     """
-    Request schema for a credit card transaction.
+    Request schema for credit card transaction.
 
     The trained model expects exactly 30 features:
 
@@ -135,6 +128,21 @@ class TransactionRequest(BaseModel):
     )
 
 
+# ROOT ENDPOINT
+
+@app.get(
+    "/",
+    tags=["Health"]
+)
+def root():
+
+    return {
+        "service": "Real-Time Fraud Detection API",
+        "version": "1.0.0",
+        "status": "running"
+    }
+
+
 # HEALTH CHECK
 
 @app.get(
@@ -142,13 +150,11 @@ class TransactionRequest(BaseModel):
     tags=["Health"]
 )
 def health_check():
-    """
-    Check whether the API and ML model are ready.
-    """
 
     if not fraud_detection_service.is_ready:
 
         return {
+
             "status": "unhealthy",
 
             "model_loaded": False,
@@ -172,6 +178,7 @@ def health_check():
         }
 
     return {
+
         "status": "healthy",
 
         "model_loaded": True,
@@ -202,14 +209,11 @@ def health_check():
     tags=["Model"]
 )
 def model_info():
-    """
-    Return information about the currently
-    loaded machine learning model.
-    """
 
     if not fraud_detection_service.is_ready:
 
         raise HTTPException(
+
             status_code=503,
 
             detail=(
@@ -218,6 +222,7 @@ def model_info():
         )
 
     return {
+
         "registered_model": (
             MLFLOW_REGISTERED_MODEL_NAME
         ),
@@ -266,16 +271,13 @@ def model_info():
 def predict_transaction(
     transaction: TransactionRequest
 ):
-    """
-    Predict whether a credit card transaction
-    is fraudulent or legitimate.
-    """
 
     # CHECK MODEL AVAILABILITY
 
     if not fraud_detection_service.is_ready:
 
         raise HTTPException(
+
             status_code=503,
 
             detail=(
@@ -286,13 +288,11 @@ def predict_transaction(
     try:
 
         # Convert Pydantic model to dictionary
-
         transaction_data = (
             transaction.model_dump()
         )
 
         # Generate prediction
-
         result = (
             fraud_detection_service.predict(
                 transaction_data
@@ -304,6 +304,7 @@ def predict_transaction(
     except ValueError as error:
 
         raise HTTPException(
+
             status_code=400,
 
             detail=str(
@@ -314,6 +315,7 @@ def predict_transaction(
     except Exception as error:
 
         raise HTTPException(
+
             status_code=500,
 
             detail=(
