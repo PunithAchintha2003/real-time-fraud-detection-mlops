@@ -1,25 +1,206 @@
-version: "3.9"
-
 services:
 
+
+  # MLFLOW SERVER
+
+
+  mlflow-server:
+
+    image: ghcr.io/mlflow/mlflow:v3.14.0
+
+    container_name: fraud-detection-mlflow
+
+    ports:
+      - "5001:5000"
+
+    environment:
+
+      MLFLOW_HOST: 0.0.0.0
+
+      MLFLOW_PORT: 5000
+
+    volumes:
+
+      # MLflow backend database
+      - mlflow-db:/mlflow/db
+
+      # Shared MLflow artifact storage
+      - mlflow-artifacts:/mlflow/mlruns
+
+    command:
+
+      - mlflow
+      - server
+
+      - --host
+      - 0.0.0.0
+
+      - --port
+      - "5000"
+
+      - --backend-store-uri
+      - sqlite:////mlflow/db/mlflow.db
+
+      # IMPORTANT:
+      # Artifact root must be accessible
+      # through the MLflow server.
+      - --default-artifact-root
+      - /mlflow/mlruns
+
+      - --allowed-hosts
+      - "mlflow-server,mlflow-server:5000,localhost,localhost:5001,127.0.0.1,127.0.0.1:5001"
+
+    healthcheck:
+
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"
+        ]
+
+      interval: 10s
+
+      timeout: 5s
+
+      retries: 12
+
+      start_period: 30s
+
+    restart: unless-stopped
+
+
+
+  # MODEL TRAINER
+
+
+  trainer:
+
+    build:
+
+      context: .
+
+      dockerfile: Dockerfile
+
+    container_name: fraud-detection-trainer
+
+    environment:
+
+      # MLflow server
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+
+      # MLflow experiment
+      MLFLOW_EXPERIMENT_NAME: fraud-detection-model-comparison
+
+      # Registered model
+      MLFLOW_REGISTERED_MODEL_NAME: FraudDetectionModel
+
+      # Champion alias
+      MLFLOW_MODEL_ALIAS: champion
+
+      # Fraud threshold
+      FRAUD_THRESHOLD: 0.5
+
+    volumes:
+
+      # Dataset
+      - ./data:/app/data
+
+      # Local model files
+      - ./models:/app/models
+
+      # IMPORTANT:
+      # Share MLflow artifact storage with MLflow server
+      - mlflow-artifacts:/mlflow/mlruns
+
+    depends_on:
+
+      mlflow-server:
+
+        condition: service_healthy
+
+    command:
+
+      [
+        "python",
+        "-m",
+        "src.training.train"
+      ]
+
+    restart: "no"
+
+
+
+  # FASTAPI FRAUD DETECTION API
+
+
   fraud-api:
-    build: .
+
+    build:
+
+      context: .
+
+      dockerfile: Dockerfile
 
     container_name: fraud-detection-api
 
     ports:
+
       - "8000:8000"
 
     environment:
-      MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+
+      # MLflow server
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+
+      # MLflow experiment
       MLFLOW_EXPERIMENT_NAME: fraud-detection-model-comparison
+
+      # Registered model
       MLFLOW_REGISTERED_MODEL_NAME: FraudDetectionModel
+
+      # Champion alias
       MLFLOW_MODEL_ALIAS: champion
+
+      # Fraud threshold
       FRAUD_THRESHOLD: 0.5
 
     volumes:
-      - ./mlflow.db:/app/mlflow.db
-      - ./mlruns:/app/mlruns
+
+      # Local model files
       - ./models:/app/models
 
+      # IMPORTANT:
+      # Shared MLflow artifact storage
+      - mlflow-artifacts:/mlflow/mlruns
+
+    depends_on:
+
+      mlflow-server:
+
+        condition: service_healthy
+
+    command:
+
+      [
+        "uvicorn",
+        "api.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ]
+
     restart: unless-stopped
+
+
+# DOCKER VOLUMES
+
+volumes:
+
+  # Persistent MLflow SQLite database
+  mlflow-db:
+
+  # Shared MLflow model artifacts
+  mlflow-artifacts:

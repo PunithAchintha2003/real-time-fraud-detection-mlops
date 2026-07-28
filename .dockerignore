@@ -1,43 +1,50 @@
 # Python
+
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 
 # Virtual Environment
+
 .venv/
 venv/
+env/
 
 # Git
+
 .git/
 .gitignore
 
 # macOS
+
 .DS_Store
 
 # IDE
+
 .vscode/
 .idea/
 
-# Testing
+# Testing / Cache
+
 .pytest_cache/
 .coverage
+htmlcov/
 
 # Logs
+
 *.log
 
-# Environment
+# Environment Variables
+
 .env
 
-# Documentation
-README.md
-LICENSE
+# MLflow Cache
 
-# Docker
-docker-compose.yml
-
-# MLflow cache
 mlartifacts/
 
-# Temporary files
+# Temporary Files
+
 *.tmp
 *.swp
+*.swo
