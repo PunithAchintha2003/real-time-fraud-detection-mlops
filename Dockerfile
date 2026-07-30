@@ -12,6 +12,9 @@ ENV PYTHONUNBUFFERED=1
 # Make project modules importable
 ENV PYTHONPATH=/app
 
+# Reduce MLflow Git warning noise
+ENV GIT_PYTHON_REFRESH=quiet
+
 
 # WORKING DIRECTORY
 
@@ -23,19 +26,17 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
-    gcc && \
+    gcc \
+    git && \
     rm -rf /var/lib/apt/lists/*
 
 
 # PYTHON DEPENDENCIES
 
-# Copy requirements first
-# This improves Docker layer caching
-
 COPY requirements.txt .
 
+COPY pytest.ini .
 
-# Upgrade pip and install dependencies
 
 RUN pip install \
     --no-cache-dir \
@@ -47,22 +48,20 @@ RUN pip install \
 
 # APPLICATION SOURCE CODE
 
-# Copy API
+# Copy FastAPI application
 COPY api ./api
 
-# Copy source code
+# Copy ML source code
 COPY src ./src
 
-# Copy models directory
-# Local model fallback will be available here
-
+# Copy trained local models
 COPY models ./models
+
+# Copy automated tests
+COPY tests ./tests
 
 
 # APPLICATION DATA
-
-# Create data directory
-# Dataset is mounted by docker-compose
 
 RUN mkdir -p /app/data
 
@@ -73,12 +72,5 @@ EXPOSE 8000
 
 
 # DEFAULT APPLICATION
-
-# Default command starts FastAPI.
-#
-# Trainer overrides this command through
-# docker-compose.yml.
-
-# Start FastAPI application
 
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
