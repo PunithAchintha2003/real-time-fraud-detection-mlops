@@ -34,12 +34,13 @@ def load_model_from_mlflow() -> Tuple[Any, Optional[str]]:
     Load the current Champion model from MLflow Model Registry.
 
     Returns:
-        tuple:
-            model
-            model_version
+        Tuple containing:
+            - Loaded MLflow model
+            - Model version as a string
     """
 
-    # Create MLflow model URI
+    # Create MLflow model URI using the Champion alias
+
     model_uri = (
         f"models:/"
         f"{MLFLOW_REGISTERED_MODEL_NAME}"
@@ -51,16 +52,17 @@ def load_model_from_mlflow() -> Tuple[Any, Optional[str]]:
     )
 
     # Create MLflow client
+
     client = MlflowClient(
         tracking_uri=MLFLOW_TRACKING_URI
     )
 
-    # GET CHAMPION MODEL VERSION
+    # Get Champion model version
 
     model_version_info = (
         client.get_model_version_by_alias(
             name=MLFLOW_REGISTERED_MODEL_NAME,
-            alias=MLFLOW_MODEL_ALIAS
+            alias=MLFLOW_MODEL_ALIAS,
         )
     )
 
@@ -73,7 +75,7 @@ def load_model_from_mlflow() -> Tuple[Any, Optional[str]]:
         f"{model_version}"
     )
 
-    # LOAD MODEL
+    # Load model from MLflow
 
     model = mlflow.sklearn.load_model(
         model_uri
@@ -81,9 +83,8 @@ def load_model_from_mlflow() -> Tuple[Any, Optional[str]]:
 
     return (
         model,
-        model_version
+        model_version,
     )
-
 
 # LOAD LOCAL MODEL
 
@@ -91,7 +92,11 @@ def load_local_model():
     """
     Load the locally saved model.
 
-    Used as fallback when MLflow model loading fails.
+    This model is used as a fallback if the
+    MLflow Champion model cannot be loaded.
+
+    Returns:
+        Locally loaded machine learning model.
     """
 
     if not MODEL_PATH.exists():
@@ -112,11 +117,16 @@ def load_local_model():
 
 def load_model():
     """
-    Load fraud detection model.
+    Load the fraud detection model.
 
-    MLflow Champion model is primary source.
+    MLflow Champion model is the primary source.
 
-    Local joblib model is fallback.
+    If MLflow model loading fails,
+    the locally saved joblib model is used
+    as a fallback.
+
+    Returns:
+        Loaded machine learning model.
     """
 
     try:
@@ -144,6 +154,12 @@ def load_model():
 def load_scaler():
     """
     Load the fitted StandardScaler.
+
+    The scaler must be the same scaler that
+    was fitted during model training.
+
+    Returns:
+        Loaded scaler.
     """
 
     if not SCALER_PATH.exists():
@@ -166,10 +182,10 @@ class FraudDetectionService:
     """
     Service responsible for:
 
-    - Loading MLflow Champion model
-    - Falling back to local model
-    - Loading fitted scaler
-    - Preprocessing transactions
+    - Loading the MLflow Champion model
+    - Falling back to the local model
+    - Loading the fitted scaler
+    - Preprocessing transaction data
     - Generating fraud predictions
     """
 
@@ -190,22 +206,28 @@ class FraudDetectionService:
 
     def load(self):
         """
-        Load MLflow Champion model and scaler.
+        Load the MLflow Champion model and scaler.
 
-        MLflow is the primary source.
+        MLflow Champion model is the primary source.
 
-        Local joblib model is fallback.
+        Local joblib model is used as fallback
+        if MLflow loading fails.
+
+        The service is marked as ready only after
+        both model and scaler are successfully loaded.
         """
 
-        
-        # TRY MLFLOW MODEL
-        
+        # Reset readiness before loading
+
+        self.is_ready = False
+
+        # TRY TO LOAD MLFLOW CHAMPION MODEL
 
         try:
 
             (
                 self.model,
-                self.model_version
+                self.model_version,
             ) = load_model_from_mlflow()
 
             self.model_source = "mlflow"
@@ -244,9 +266,8 @@ class FraudDetectionService:
                 "Local model loaded successfully."
             )
 
-        
+
         # LOAD SCALER
-        
 
         self.scaler = load_scaler()
 
@@ -255,20 +276,41 @@ class FraudDetectionService:
         )
 
 
+        # MARK SERVICE AS READY
+
+        self.is_ready = True
+
+        print(
+            "Fraud detection service is ready."
+        )
+
     # PREDICT
-    
 
     def predict(
         self,
-        transaction: Dict[str, Any]
+        transaction: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
-        Generate fraud prediction.
+        Generate a fraud prediction for a transaction.
+
+        Args:
+            transaction:
+                Dictionary containing all required
+                transaction features.
+
+        Returns:
+            Dictionary containing:
+
+            - prediction
+            - is_fraud
+            - fraud_probability
+            - threshold
+            - result
+            - model_source
+            - model_version
         """
 
-        
         # CHECK SERVICE READINESS
-        
 
         if not self.is_ready:
 
@@ -277,9 +319,8 @@ class FraudDetectionService:
                 "is not ready."
             )
 
-        
-        # VALIDATE FEATURES
-        
+
+        # VALIDATE REQUIRED FEATURES
 
         missing_features = [
             feature
@@ -296,9 +337,8 @@ class FraudDetectionService:
                 )
             )
 
-        
-        # CREATE DATAFRAME
-        
+
+        # CREATE INPUT DATAFRAME
 
         input_data = pd.DataFrame(
             [
@@ -307,22 +347,20 @@ class FraudDetectionService:
                     for feature in FEATURE_COLUMNS
                 ]
             ],
-            columns=FEATURE_COLUMNS
+            columns=FEATURE_COLUMNS,
         )
 
-        
+
         # PREPROCESS INPUT
-        
 
         processed_data = preprocess_features(
             input_data,
             self.scaler,
-            fit_scaler=False
+            fit_scaler=False,
         )
 
-        
+
         # GENERATE FRAUD PROBABILITY
-        
 
         fraud_probability = (
             self.model.predict_proba(
@@ -334,18 +372,16 @@ class FraudDetectionService:
             fraud_probability
         )
 
-        
+
         # APPLY FRAUD THRESHOLD
-        
 
         prediction = int(
             fraud_probability
             >= FRAUD_THRESHOLD
         )
 
-        
-        # RETURN RESULT
-        
+
+        # RETURN PREDICTION RESULT
 
         return {
 
@@ -357,7 +393,7 @@ class FraudDetectionService:
 
             "fraud_probability": round(
                 fraud_probability,
-                6
+                6,
             ),
 
             "threshold": FRAUD_THRESHOLD,
@@ -378,7 +414,7 @@ class FraudDetectionService:
                 )
                 if self.model_version is not None
                 else None
-            )
+            ),
         }
 
 
@@ -392,7 +428,7 @@ fraud_detection_service = (
 # PUBLIC PREDICTION FUNCTION
 
 def predict_transaction(
-    transaction: Dict[str, Any]
+    transaction: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Public prediction function.
@@ -400,8 +436,11 @@ def predict_transaction(
     Used by:
 
     - Unit tests
-    - API
+    - FastAPI
     - Other inference clients
+
+    Automatically loads the inference service
+    if it has not already been initialized.
     """
 
     if not fraud_detection_service.is_ready:
@@ -497,14 +536,18 @@ def main():
 
     print("=" * 60)
 
-    # Load service
+
+    # LOAD INFERENCE SERVICE
+
     print(
         "\nLoading fraud detection service..."
     )
 
     fraud_detection_service.load()
 
-    # Generate prediction
+
+    # GENERATE PREDICTION
+
     print(
         "\nGenerating prediction..."
     )
@@ -513,7 +556,9 @@ def main():
         SAMPLE_TRANSACTION
     )
 
-    # Display result
+
+    # DISPLAY RESULT
+
     print(
         "\n" + "=" * 60
     )
