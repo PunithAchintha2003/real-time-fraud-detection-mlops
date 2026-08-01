@@ -1,0 +1,161 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "cjs"
+  generatedFileExtension = "ts"
+  importFileExtension    = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ANALYST
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TransactionStatus {
+  PENDING
+  ANALYZED
+  FAILED
+}
+
+enum PredictionResult {
+  LEGITIMATE
+  FRAUDULENT
+}
+
+enum AlertStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  DISMISSED
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole   @default(USER)
+  status       UserStatus @default(ACTIVE)
+
+  transactions Transaction[]
+  auditLogs    AuditLog[]    @relation("AuditLogActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  externalId    String?           @unique
+  userId        String?
+  time          Float
+  amount        Decimal           @db.Decimal(18, 2)
+  featureVector Json
+  status        TransactionStatus @default(PENDING)
+
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  prediction Prediction?
+  alerts     FraudAlert[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model Prediction {
+  id               String           @id @default(uuid())
+  transactionId    String           @unique
+  prediction       Int
+  isFraud          Boolean
+  fraudProbability Float
+  threshold        Float
+  result           PredictionResult
+  modelSource      String
+  modelVersion     String?
+  processingTimeMs Int?
+
+  transaction Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  alerts      FraudAlert[]
+
+  createdAt DateTime @default(now())
+
+  @@index([isFraud])
+  @@index([result])
+  @@index([modelVersion])
+  @@index([createdAt])
+  @@map("predictions")
+}
+
+model FraudAlert {
+  id            String        @id @default(uuid())
+  transactionId String
+  predictionId  String
+  title         String
+  description   String?
+  severity      AlertSeverity @default(HIGH)
+  status        AlertStatus   @default(OPEN)
+  resolvedAt    DateTime?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  prediction  Prediction  @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transactionId])
+  @@index([predictionId])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+  @@map("fraud_alerts")
+}
+
+model AuditLog {
+  id         String  @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+
+  actor User? @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

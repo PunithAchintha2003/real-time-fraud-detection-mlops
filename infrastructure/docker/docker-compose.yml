@@ -1,9 +1,9 @@
 name: real-time-fraud-detection-mlops
 
 services:
-
+  # ==========================================================
   # MLFLOW TRACKING SERVER
-
+  # ==========================================================
   mlflow-server:
     image: ghcr.io/mlflow/mlflow:v3.14.0
     container_name: fraud-detection-mlflow
@@ -16,10 +16,7 @@ services:
       MLFLOW_PORT: "5000"
 
     volumes:
-      # Persistent MLflow SQLite database
       - mlflow-db:/mlflow/db
-
-      # Persistent MLflow artifacts
       - mlflow-artifacts:/mlflow/mlruns
 
     command:
@@ -54,11 +51,9 @@ services:
     networks:
       - fraud-detection-network
 
+  # ==========================================================
   # MODEL TRAINING SERVICE
-  # Run manually:
-  # docker compose -f infrastructure/docker/docker-compose.yml
-  # run --rm trainer
-
+  # ==========================================================
   trainer:
     build:
       context: ../../apps/ml-service
@@ -76,13 +71,8 @@ services:
       GIT_PYTHON_REFRESH: quiet
 
     volumes:
-      # Training dataset
       - ../../apps/ml-service/data:/app/data:ro
-
-      # Local model and scaler output
       - ../../apps/ml-service/models:/app/models
-
-      # Shared MLflow artifacts
       - mlflow-artifacts:/mlflow/mlruns
 
     depends_on:
@@ -99,8 +89,9 @@ services:
     networks:
       - fraud-detection-network
 
+  # ==========================================================
   # FASTAPI ML INFERENCE SERVICE
-
+  # ==========================================================
   ml-service:
     build:
       context: ../../apps/ml-service
@@ -121,10 +112,7 @@ services:
       GIT_PYTHON_REFRESH: quiet
 
     volumes:
-      # Local fallback model and fitted scaler
       - ../../apps/ml-service/models:/app/models
-
-      # Shared MLflow artifacts required for model loading
       - mlflow-artifacts:/mlflow/mlruns
 
     depends_on:
@@ -157,18 +145,57 @@ services:
     networks:
       - fraud-detection-network
 
-# NETWORKS
+  # ==========================================================
+  # POSTGRESQL DATABASE
+  # ==========================================================
+  postgres:
+    image: postgres:17-alpine
+    container_name: fraud-detection-postgres
 
+    ports:
+      - "127.0.0.1:15432:5432"
+
+    environment:
+      POSTGRES_DB: fraud_detection
+      POSTGRES_USER: fraud_admin
+      POSTGRES_PASSWORD: fraud_password
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U fraud_admin -d fraud_detection"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    restart: unless-stopped
+
+    networks:
+      - fraud-detection-network
+
+# ============================================================
+# NETWORKS
+# ============================================================
 networks:
   fraud-detection-network:
     name: fraud-detection-network
     driver: bridge
 
+# ============================================================
 # PERSISTENT VOLUMES
-
+# ============================================================
 volumes:
   mlflow-db:
     name: fraud-detection-mlflow-db
 
   mlflow-artifacts:
     name: fraud-detection-mlflow-artifacts
+
+  postgres-data:
+    name: fraud-detection-postgres-data
