@@ -65,3 +65,7 @@ mlartifacts/
 # mlflow.db-shm
 # mlflow.db-wal
 # mlruns/
+
+# ML artifacts
+data/
+models/
