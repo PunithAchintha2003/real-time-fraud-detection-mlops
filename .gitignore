@@ -1,5 +1,4 @@
 # PYTHON
-
 __pycache__/
 *.py[cod]
 *.pyo
@@ -7,48 +6,40 @@ __pycache__/
 
 
 # VIRTUAL ENVIRONMENTS
-
 .venv/
 venv/
 env/
 
 
 # NODE.JS
-
 node_modules/
 .pnpm-store/
 .npm/
 
 
 # NEXT.JS
-
 .next/
 out/
 
 
 # NESTJS
-
 dist/
 
 
 # GIT
-
 .git/
 
 
 # MACOS
-
 .DS_Store
 
 
 # IDE
-
 .vscode/
 .idea/
 
 
 # TESTING
-
 .pytest_cache/
 .coverage
 htmlcov/
@@ -56,12 +47,10 @@ coverage/
 
 
 # LOGS
-
 *.log
 
 
 # ENVIRONMENT VARIABLES
-
 .env
 .env.local
 .env.development.local
@@ -69,19 +58,16 @@ coverage/
 
 
 # TEMP FILES
-
 *.tmp
 *.swp
 *.swo
 
 
 # MLFLOW
-
 mlartifacts/
 
 # Uncomment these if you DO NOT want to commit
 # the local MLflow database.
-
 # mlflow.db
 # mlflow.db-shm
 # mlflow.db-wal
@@ -89,16 +75,13 @@ mlartifacts/
 
 
 # ML ARTIFACTS
-
 data/
 models/
 
 
 # DOCKER
-
 docker-data/
 
 
 # OS
-
 Thumbs.db
