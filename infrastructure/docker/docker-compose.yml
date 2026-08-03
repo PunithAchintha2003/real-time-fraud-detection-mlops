@@ -55,6 +55,9 @@ services:
   # MODEL TRAINING SERVICE
   # ==========================================================
   trainer:
+    profiles:
+      - training
+
     build:
       context: ../../apps/ml-service
       dockerfile: Dockerfile
