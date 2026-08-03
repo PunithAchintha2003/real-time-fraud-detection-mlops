@@ -2,56 +2,110 @@
 
 import { FormEvent, useState } from "react";
 
-type PredictionResponse = {
+type BusinessPredictionResponse = {
   prediction: number;
   is_fraud: boolean;
   fraud_probability: number;
   threshold: number;
   result: string;
-  model_source: string;
+  risk_level: string;
+  model_type: string;
   model_version: string;
+  features_used: number;
+  engineered_features: Record<string, number>;
 };
 
 type FraudFormProps = {
   dark: boolean;
 };
 
-const featureNames = Array.from({ length: 28 }, (_, index) => `V${index + 1}`);
+const merchantTypes = [
+  { label: "Online Purchase", value: "online_purchase" },
+  { label: "Grocery", value: "grocery" },
+  { label: "Restaurant", value: "restaurant" },
+  { label: "Fuel", value: "fuel" },
+  { label: "Electronics", value: "electronics" },
+  { label: "Travel", value: "travel" },
+  { label: "Digital Goods", value: "digital_goods" },
+  { label: "Crypto", value: "crypto" },
+  { label: "Gaming", value: "gaming" },
+  { label: "Other", value: "other" },
+];
 
-function createInitialFeatures() {
-  const values: Record<string, string> = {};
+const locations = [
+  { label: "Sri Lanka", value: "sri_lanka" },
+  { label: "India", value: "india" },
+  { label: "UAE", value: "uae" },
+  { label: "Singapore", value: "singapore" },
+  { label: "United Kingdom", value: "united_kingdom" },
+  { label: "United States", value: "united_states" },
+  { label: "Nigeria", value: "nigeria" },
+  { label: "Unknown", value: "unknown" },
+  { label: "Other", value: "other" },
+];
 
-  featureNames.forEach((feature) => {
-    values[feature] = "0";
-  });
+const paymentMethods = [
+  { label: "Card", value: "card" },
+  { label: "Bank Transfer", value: "bank_transfer" },
+  { label: "Wallet", value: "wallet" },
+  { label: "Crypto", value: "crypto" },
+  { label: "Cash", value: "cash" },
+  { label: "Other", value: "other" },
+];
 
-  return values;
-}
+const deviceTypes = [
+  { label: "Mobile", value: "mobile" },
+  { label: "Desktop", value: "desktop" },
+  { label: "Tablet", value: "tablet" },
+  { label: "Unknown", value: "unknown" },
+  { label: "Other", value: "other" },
+];
 
 export default function FraudForm({ dark }: FraudFormProps) {
-  const [time, setTime] = useState("0");
   const [amount, setAmount] = useState("");
-  const [features, setFeatures] = useState<Record<string, string>>(
-    createInitialFeatures
-  );
+  const [merchantType, setMerchantType] = useState("online_purchase");
+  const [location, setLocation] = useState("sri_lanka");
+  const [transactionTime, setTransactionTime] = useState("14:30");
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [deviceType, setDeviceType] = useState("mobile");
+  const [isInternational, setIsInternational] = useState(false);
+  const [failedPaymentAttempts, setFailedPaymentAttempts] = useState("0");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<PredictionResponse | null>(null);
+  const [result, setResult] = useState<BusinessPredictionResponse | null>(null);
 
-  function updateFeature(name: string, value: string) {
-    setFeatures((currentValues) => ({
-      ...currentValues,
-      [name]: value,
-    }));
-  }
+  const labelClass = dark
+    ? "mb-1 block text-xs font-semibold text-white/70"
+    : "mb-1 block text-xs font-semibold text-black/60";
+
+  const inputClass = dark
+    ? "h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm font-medium text-white outline-none transition placeholder:text-white/40 focus:border-white/40 focus:bg-black/60"
+    : "h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black outline-none transition placeholder:text-black/40 focus:border-black/40 focus:bg-white";
+
+  const selectClass = dark
+    ? "h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm font-medium text-white outline-none transition focus:border-white/40 focus:bg-black/60"
+    : "h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black outline-none transition focus:border-black/40 focus:bg-white";
+
+  const panelClass = dark
+    ? "rounded-2xl border border-white/10 bg-black/30 p-4 text-white"
+    : "rounded-2xl border border-black/10 bg-white/80 p-4 text-black";
+
+  const checkboxClass = dark
+    ? "h-5 w-5 accent-white"
+    : "h-5 w-5 accent-black";
 
   function clearForm() {
-    setTime("0");
     setAmount("");
-    setFeatures(createInitialFeatures());
-    setResult(null);
+    setMerchantType("online_purchase");
+    setLocation("sri_lanka");
+    setTransactionTime("14:30");
+    setPaymentMethod("card");
+    setDeviceType("mobile");
+    setIsInternational(false);
+    setFailedPaymentAttempts("0");
     setError("");
+    setResult(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -61,40 +115,34 @@ export default function FraudForm({ dark }: FraudFormProps) {
     setError("");
     setResult(null);
 
-    const parsedTime = Number(time);
     const parsedAmount = Number(amount);
+    const parsedFailedAttempts = Number(failedPaymentAttempts);
 
-    if (Number.isNaN(parsedTime) || Number.isNaN(parsedAmount)) {
-      setError("Please enter valid numbers for Time and Amount.");
+    if (Number.isNaN(parsedAmount) || parsedAmount < 0) {
+      setError("Please enter a valid transaction amount.");
       setLoading(false);
       return;
     }
 
-    if (parsedAmount < 0) {
-      setError("Amount cannot be negative.");
+    if (Number.isNaN(parsedFailedAttempts) || parsedFailedAttempts < 0) {
+      setError("Failed payment attempts must be a valid number.");
       setLoading(false);
       return;
     }
 
-    const payload: Record<string, number> = {
-      Time: parsedTime,
-      Amount: parsedAmount,
+    const payload = {
+      amount: parsedAmount,
+      merchant_type: merchantType,
+      location,
+      transaction_time: transactionTime,
+      payment_method: paymentMethod,
+      device_type: deviceType,
+      is_international: isInternational,
+      previous_failed_attempts: parsedFailedAttempts,
     };
 
-    for (const feature of featureNames) {
-      const value = Number(features[feature]);
-
-      if (Number.isNaN(value)) {
-        setError(`${feature} must be a valid number.`);
-        setLoading(false);
-        return;
-      }
-
-      payload[feature] = value;
-    }
-
     try {
-      const response = await fetch("/fastapi/predict", {
+      const response = await fetch("/fastapi/predict-business", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -106,45 +154,21 @@ export default function FraudForm({ dark }: FraudFormProps) {
         throw new Error("Prediction request failed.");
       }
 
-      const data = (await response.json()) as PredictionResponse;
+      const data = (await response.json()) as BusinessPredictionResponse;
 
       setResult(data);
     } catch {
-      setError("Cannot connect to FastAPI. Make sure the API is running.");
+      setError("Cannot connect to FastAPI business prediction endpoint.");
     } finally {
       setLoading(false);
     }
   }
 
-  const inputClass = dark
-    ? "h-9 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm font-medium text-white outline-none transition placeholder:text-white/40 focus:border-white/40 focus:bg-black/60"
-    : "h-9 w-full rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black outline-none transition placeholder:text-black/40 focus:border-black/40 focus:bg-white";
-
-  const labelClass = dark
-    ? "mb-1 block text-xs font-semibold text-white/70"
-    : "mb-1 block text-xs font-semibold text-black/60";
-
-  const panelClass = dark
-    ? "rounded-2xl border border-white/10 bg-black/30 p-4 text-white"
-    : "rounded-2xl border border-black/10 bg-white/80 p-4 text-black";
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className={labelClass}>Time</label>
-          <input
-            type="number"
-            step="any"
-            value={time}
-            onChange={(event) => setTime(event.target.value)}
-            className={inputClass}
-            placeholder="0"
-          />
-        </div>
-
-        <div>
-          <label className={labelClass}>Amount</label>
+          <label className={labelClass}>Transaction Amount</label>
           <input
             type="number"
             step="any"
@@ -156,36 +180,112 @@ export default function FraudForm({ dark }: FraudFormProps) {
             required
           />
         </div>
-      </div>
 
-      <div
-        className="
-          grid
-          max-h-[42vh]
-          grid-cols-2
-          gap-3
-          overflow-y-auto
-          pr-1
-          sm:max-h-[45vh]
-          sm:grid-cols-4
-          lg:max-h-none
-          lg:grid-cols-7
-          lg:overflow-visible
-        "
-      >
-        {featureNames.map((feature) => (
-          <div key={feature}>
-            <label className={labelClass}>{feature}</label>
-            <input
-              type="number"
-              step="any"
-              value={features[feature]}
-              onChange={(event) => updateFeature(feature, event.target.value)}
-              className={inputClass}
-              placeholder="0"
-            />
+        <div>
+          <label className={labelClass}>Transaction Time</label>
+          <input
+            type="time"
+            value={transactionTime}
+            onChange={(event) => setTransactionTime(event.target.value)}
+            className={inputClass}
+            required
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Merchant Type</label>
+          <select
+            value={merchantType}
+            onChange={(event) => setMerchantType(event.target.value)}
+            className={selectClass}
+          >
+            {merchantTypes.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>Location</label>
+          <select
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            className={selectClass}
+          >
+            {locations.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>Payment Method</label>
+          <select
+            value={paymentMethod}
+            onChange={(event) => setPaymentMethod(event.target.value)}
+            className={selectClass}
+          >
+            {paymentMethods.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>Device Type</label>
+          <select
+            value={deviceType}
+            onChange={(event) => setDeviceType(event.target.value)}
+            className={selectClass}
+          >
+            {deviceTypes.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>Failed Payment Attempts</label>
+          <input
+            type="number"
+            min="0"
+            value={failedPaymentAttempts}
+            onChange={(event) => setFailedPaymentAttempts(event.target.value)}
+            className={inputClass}
+            placeholder="0"
+          />
+        </div>
+
+        <div
+          className={
+            dark
+              ? "flex h-[70px] items-center justify-between rounded-xl border border-white/10 bg-black/40 px-4"
+              : "flex h-[70px] items-center justify-between rounded-xl border border-black/10 bg-white px-4"
+          }
+        >
+          <div>
+            <p className="text-sm font-semibold">International Payment</p>
+
+            <p className={dark ? "text-xs text-white/50" : "text-xs text-black/50"}>
+              Payment is outside the customer’s home country
+            </p>
           </div>
-        ))}
+
+          <input
+            type="checkbox"
+            checked={isInternational}
+            onChange={(event) => setIsInternational(event.target.checked)}
+            className={checkboxClass}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -198,7 +298,7 @@ export default function FraudForm({ dark }: FraudFormProps) {
               : "h-11 rounded-xl bg-black text-sm font-bold text-white transition hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-60"
           }
         >
-          {loading ? "Analyzing..." : "Analyze Transaction"}
+          {loading ? "Checking..." : "Check Transaction"}
         </button>
 
         <button
@@ -237,10 +337,12 @@ export default function FraudForm({ dark }: FraudFormProps) {
                     : "text-sm font-semibold text-emerald-400"
                 }
               >
-                {result.is_fraud ? "Fraud Detected" : "Legitimate Transaction"}
+                {result.risk_level}
               </p>
 
-              <h2 className="mt-1 text-2xl font-bold">{result.result}</h2>
+              <h2 className="mt-1 text-2xl font-bold">
+                {result.is_fraud ? "Fraud Detected" : "Legitimate Transaction"}
+              </h2>
             </div>
 
             <div
@@ -268,22 +370,22 @@ export default function FraudForm({ dark }: FraudFormProps) {
             }
           >
             <div>
-              <p className="font-semibold">Prediction</p>
-              <p>{result.prediction}</p>
+              <p className="font-semibold">Decision</p>
+              <p>{result.is_fraud ? "Fraud" : "Legitimate"}</p>
             </div>
 
             <div>
-              <p className="font-semibold">Threshold</p>
-              <p>{result.threshold}</p>
+              <p className="font-semibold">Risk Threshold</p>
+              <p>{(result.threshold * 100).toFixed(0)}%</p>
             </div>
 
             <div>
-              <p className="font-semibold">Model Source</p>
-              <p>{result.model_source}</p>
+              <p className="font-semibold">Model</p>
+              <p>{result.model_type}</p>
             </div>
 
             <div>
-              <p className="font-semibold">Model Version</p>
+              <p className="font-semibold">Version</p>
               <p>{result.model_version}</p>
             </div>
           </div>
