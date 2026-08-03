@@ -46,32 +46,34 @@ def load_business_model() -> dict[str, Any] | None:
     return artifact
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global business_artifact
-
-    print("Starting Fraud Detection API...")
+def ensure_fraud_model_loaded() -> bool:
+    if fraud_detection_service.is_ready:
+        return True
 
     try:
         fraud_detection_service.load()
-        print("MLflow champion fraud model loaded.")
+        print("Fraud detection model loaded.")
 
     except Exception as error:
         print(
-            "ERROR: Failed to load MLflow fraud detection model: "
+            "ERROR: Failed to load fraud detection model: "
             f"{error}"
         )
+
+    return fraud_detection_service.is_ready
+
+
+def ensure_business_model_loaded() -> bool:
+    global business_artifact
+
+    if business_artifact is not None:
+        return True
 
     try:
         business_artifact = load_business_model()
 
         if business_artifact is not None:
             print("Business fraud model loaded.")
-        else:
-            print(
-                "Business fraud model not found. "
-                "Run: python -m src.training.train_business_model"
-            )
 
     except Exception as error:
         business_artifact = None
@@ -79,6 +81,46 @@ async def lifespan(app: FastAPI):
         print(
             "ERROR: Failed to load business fraud model: "
             f"{error}"
+        )
+
+    return business_artifact is not None
+
+
+def get_model_version() -> str | None:
+    if fraud_detection_service.model_version is not None:
+        return str(fraud_detection_service.model_version)
+
+    if fraud_detection_service.is_ready:
+        return "local"
+
+    return None
+
+
+def get_model_source() -> str | None:
+    if fraud_detection_service.model_source is not None:
+        return str(fraud_detection_service.model_source)
+
+    if fraud_detection_service.is_ready:
+        return "local"
+
+    return None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Starting Fraud Detection API...")
+
+    if ensure_fraud_model_loaded():
+        print("MLflow/local fraud model loaded.")
+    else:
+        print("Fraud detection model not loaded.")
+
+    if ensure_business_model_loaded():
+        print("Business fraud model loaded.")
+    else:
+        print(
+            "Business fraud model not found. "
+            "Run: python -m src.training.train_business_model"
         )
 
     print("Fraud Detection API startup completed.")
@@ -234,26 +276,34 @@ def root():
     tags=["Health"],
 )
 def health_check():
+    fraud_model_loaded = ensure_fraud_model_loaded()
+    business_model_loaded = ensure_business_model_loaded()
+
+    model_version = get_model_version()
+    model_source = get_model_source()
+
     return {
         "status": (
             "healthy"
             if (
-                fraud_detection_service.is_ready
-                or business_artifact is not None
+                fraud_model_loaded
+                or business_model_loaded
             )
             else "unhealthy"
         ),
+
+        # Backward-compatible top-level fields for tests
+        "model_loaded": fraud_model_loaded,
+        "model_source": model_source,
+        "model_version": model_version,
+
         "mlflow_model": {
-            "model_loaded": fraud_detection_service.is_ready,
-            "model_source": fraud_detection_service.model_source,
-            "model_version": (
-                str(fraud_detection_service.model_version)
-                if fraud_detection_service.model_version is not None
-                else None
-            ),
+            "model_loaded": fraud_model_loaded,
+            "model_source": model_source,
+            "model_version": model_version,
         },
         "business_model": {
-            "model_loaded": business_artifact is not None,
+            "model_loaded": business_model_loaded,
             "model_path": str(BUSINESS_MODEL_PATH),
             "model_version": (
                 str(
@@ -266,7 +316,7 @@ def health_check():
                 else None
             ),
         },
-        "business_model_loaded": business_artifact is not None,
+        "business_model_loaded": business_model_loaded,
         "message": "Fraud detection API health check completed.",
     }
 
@@ -276,7 +326,7 @@ def health_check():
     tags=["Model"],
 )
 def model_info():
-    if not fraud_detection_service.is_ready:
+    if not ensure_fraud_model_loaded():
         raise HTTPException(
             status_code=503,
             detail="MLflow champion fraud detection model is not loaded.",
@@ -285,13 +335,9 @@ def model_info():
     return {
         "registered_model": MLFLOW_REGISTERED_MODEL_NAME,
         "model_alias": f"@{MLFLOW_MODEL_ALIAS}",
-        "model_version": (
-            str(fraud_detection_service.model_version)
-            if fraud_detection_service.model_version is not None
-            else None
-        ),
+        "model_version": get_model_version(),
         "model_type": type(fraud_detection_service.model).__name__,
-        "model_source": fraud_detection_service.model_source,
+        "model_source": get_model_source(),
         "features": len(FEATURE_COLUMNS),
         "fraud_threshold": FRAUD_THRESHOLD,
         "status": "loaded",
@@ -303,7 +349,7 @@ def model_info():
     tags=["Model"],
 )
 def business_model_info():
-    if business_artifact is None:
+    if not ensure_business_model_loaded():
         raise HTTPException(
             status_code=503,
             detail=(
@@ -342,7 +388,7 @@ def business_model_info():
     tags=["Prediction"],
 )
 def predict_transaction(transaction: TransactionRequest):
-    if not fraud_detection_service.is_ready:
+    if not ensure_fraud_model_loaded():
         raise HTTPException(
             status_code=503,
             detail="MLflow champion fraud detection model is not available.",
@@ -391,7 +437,7 @@ def classify_risk(probability: float) -> str:
 def predict_business_transaction(
     transaction: BusinessTransactionRequest,
 ) -> BusinessPredictionResponse:
-    if business_artifact is None:
+    if not ensure_business_model_loaded():
         raise HTTPException(
             status_code=503,
             detail=(

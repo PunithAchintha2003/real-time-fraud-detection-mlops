@@ -62,11 +62,21 @@ mlartifacts/
 # mlruns/
 
 # ML ARTIFACTS
-data/
-models/
+/data/
+/models/
 
 # DOCKER
 docker-data/
 
 # OS
 Thumbs.db
+
+# LOCAL MLFLOW STATE
+mlflow.db
+mlflow.db-shm
+mlflow.db-wal
+mlflow-ci.db
+mlflow-ci.db-shm
+mlflow-ci.db-wal
+mlruns/
+mlruns-ci/
