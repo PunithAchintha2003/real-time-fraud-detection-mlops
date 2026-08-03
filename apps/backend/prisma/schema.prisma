@@ -50,21 +50,28 @@ enum AlertSeverity {
 
 model User {
   id           String     @id @default(uuid())
+
   email        String     @unique
   passwordHash String
+
   firstName    String
   lastName     String
+
   role         UserRole   @default(USER)
   status       UserStatus @default(ACTIVE)
 
+  refreshToken String?
+
   transactions Transaction[]
-  auditLogs    AuditLog[]    @relation("AuditLogActor")
+  auditLogs    AuditLog[] @relation("AuditLogActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([email])
   @@index([role])
   @@index([status])
+
   @@map("users")
 }
 
