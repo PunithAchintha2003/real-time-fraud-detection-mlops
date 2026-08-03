@@ -4,40 +4,32 @@ __pycache__/
 *.pyo
 *.pyd
 
-
 # VIRTUAL ENVIRONMENTS
 .venv/
 venv/
 env/
-
 
 # NODE.JS
 node_modules/
 .pnpm-store/
 .npm/
 
-
 # NEXT.JS
 .next/
 out/
 
-
 # NESTJS
 dist/
-
 
 # GIT
 .git/
 
-
 # MACOS
 .DS_Store
-
 
 # IDE
 .vscode/
 .idea/
-
 
 # TESTING
 .pytest_cache/
@@ -45,10 +37,8 @@ dist/
 htmlcov/
 coverage/
 
-
 # LOGS
 *.log
-
 
 # ENVIRONMENT VARIABLES
 .env
@@ -56,12 +46,10 @@ coverage/
 .env.development.local
 .env.production.local
 
-
 # TEMP FILES
 *.tmp
 *.swp
 *.swo
-
 
 # MLFLOW
 mlartifacts/
@@ -73,15 +61,12 @@ mlartifacts/
 # mlflow.db-wal
 # mlruns/
 
-
 # ML ARTIFACTS
 data/
 models/
 
-
 # DOCKER
 docker-data/
-
 
 # OS
 Thumbs.db
