@@ -5,11 +5,13 @@ __pycache__/
 *.pyo
 *.pyd
 
+
 # VIRTUAL ENVIRONMENTS
 
 .venv/
 venv/
 env/
+
 
 # NODE.JS
 
@@ -17,37 +19,46 @@ node_modules/
 .pnpm-store/
 .npm/
 
-# Next.js
+
+# NEXT.JS
+
 .next/
 out/
 
-# NestJS
+
+# NESTJS
+
 dist/
+
 
 # GIT
 
 .git/
 
+
 # MACOS
 
 .DS_Store
+
 
 # IDE
 
 .vscode/
 .idea/
 
+
 # TESTING
 
 .pytest_cache/
 .coverage
 htmlcov/
-
 coverage/
+
 
 # LOGS
 
 *.log
+
 
 # ENVIRONMENT VARIABLES
 
@@ -56,11 +67,13 @@ coverage/
 .env.development.local
 .env.production.local
 
+
 # TEMP FILES
 
 *.tmp
 *.swp
 *.swo
+
 
 # MLFLOW
 
