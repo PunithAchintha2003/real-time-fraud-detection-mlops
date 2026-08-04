@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,15 @@ from src.features.business_features import (
 )
 
 from src.inference.predict import fraud_detection_service
+
+from src.monitoring.metrics import (
+    API_ERROR_COUNT,
+    API_REQUEST_COUNT,
+    API_REQUEST_LATENCY_SECONDS,
+    metrics_response,
+    record_prediction_metrics,
+    update_model_metrics,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -106,6 +116,28 @@ def get_model_source() -> str | None:
     return None
 
 
+def refresh_monitoring_model_metrics() -> None:
+    fraud_model_loaded = ensure_fraud_model_loaded()
+    business_model_loaded = ensure_business_model_loaded()
+
+    model_source = get_model_source() or "unknown"
+    model_version = get_model_version() or "unknown"
+
+    model_type = (
+        type(fraud_detection_service.model).__name__
+        if fraud_detection_service.model is not None
+        else "unknown"
+    )
+
+    update_model_metrics(
+        fraud_model_loaded=fraud_model_loaded,
+        business_model_loaded=business_model_loaded,
+        model_type=model_type,
+        model_version=model_version,
+        model_source=model_source,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting Fraud Detection API...")
@@ -123,6 +155,8 @@ async def lifespan(app: FastAPI):
             "Run: python -m src.training.train_business_model"
         )
 
+    refresh_monitoring_model_metrics()
+
     print("Fraud Detection API startup completed.")
 
     yield
@@ -134,10 +168,10 @@ app = FastAPI(
     title="Real-Time Fraud Detection API",
     description=(
         "Production-oriented machine learning API for real-time "
-        "fraud detection using MLflow Model Registry and "
-        "business-style feature engineering."
+        "fraud detection using MLflow Model Registry, "
+        "business-style feature engineering, and Prometheus monitoring."
     ),
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -152,6 +186,62 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(
+    request: Request,
+    call_next,
+):
+    endpoint = request.url.path
+    method = request.method
+
+    if endpoint == "/metrics":
+        return await call_next(request)
+
+    start_time = perf_counter()
+    response = None
+
+    try:
+        response = await call_next(request)
+
+        return response
+
+    except Exception:
+        API_ERROR_COUNT.labels(
+            method=method,
+            endpoint=endpoint,
+            http_status="500",
+        ).inc()
+
+        raise
+
+    finally:
+        duration = perf_counter() - start_time
+
+        http_status = (
+            str(response.status_code)
+            if response is not None
+            else "500"
+        )
+
+        API_REQUEST_COUNT.labels(
+            method=method,
+            endpoint=endpoint,
+            http_status=http_status,
+        ).inc()
+
+        API_REQUEST_LATENCY_SECONDS.labels(
+            method=method,
+            endpoint=endpoint,
+        ).observe(duration)
+
+        if int(http_status) >= 400:
+            API_ERROR_COUNT.labels(
+                method=method,
+                endpoint=endpoint,
+                http_status=http_status,
+            ).inc()
 
 
 class TransactionRequest(BaseModel):
@@ -266,7 +356,7 @@ class BusinessPredictionResponse(BaseModel):
 def root():
     return {
         "service": "Real-Time Fraud Detection API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "status": "running",
     }
 
@@ -282,6 +372,8 @@ def health_check():
     model_version = get_model_version()
     model_source = get_model_source()
 
+    refresh_monitoring_model_metrics()
+
     return {
         "status": (
             "healthy"
@@ -292,7 +384,6 @@ def health_check():
             else "unhealthy"
         ),
 
-        # Backward-compatible top-level fields for tests
         "model_loaded": fraud_model_loaded,
         "model_source": model_source,
         "model_version": model_version,
@@ -322,6 +413,17 @@ def health_check():
 
 
 @app.get(
+    "/metrics",
+    tags=["Monitoring"],
+    include_in_schema=False,
+)
+def metrics():
+    refresh_monitoring_model_metrics()
+
+    return metrics_response()
+
+
+@app.get(
     "/model-info",
     tags=["Model"],
 )
@@ -331,6 +433,8 @@ def model_info():
             status_code=503,
             detail="MLflow champion fraud detection model is not loaded.",
         )
+
+    refresh_monitoring_model_metrics()
 
     return {
         "registered_model": MLFLOW_REGISTERED_MODEL_NAME,
@@ -357,6 +461,8 @@ def business_model_info():
                 "Run: python -m src.training.train_business_model"
             ),
         )
+
+    refresh_monitoring_model_metrics()
 
     return {
         "model_type": business_artifact.get(
@@ -399,6 +505,28 @@ def predict_transaction(transaction: TransactionRequest):
 
         result = fraud_detection_service.predict(
             transaction_data
+        )
+
+        prediction_result = str(
+            result.get(
+                "result",
+                "Unknown",
+            )
+        )
+
+        fraud_probability = float(
+            result.get(
+                "fraud_probability",
+                0.0,
+            )
+        )
+
+        record_prediction_metrics(
+            endpoint="/predict",
+            result=prediction_result,
+            risk_level="Unknown",
+            model_version=get_model_version() or "unknown",
+            fraud_probability=fraud_probability,
         )
 
         return result
@@ -479,7 +607,15 @@ def predict_business_transaction(
             transaction_data
         )
 
-        return BusinessPredictionResponse(
+        result = (
+            "Fraud"
+            if prediction
+            else "Legitimate"
+        )
+
+        risk_level = classify_risk(fraud_probability)
+
+        response = BusinessPredictionResponse(
             prediction=prediction,
             is_fraud=bool(prediction),
             fraud_probability=round(
@@ -487,12 +623,8 @@ def predict_business_transaction(
                 6,
             ),
             threshold=threshold,
-            result=(
-                "Fraud"
-                if prediction
-                else "Legitimate"
-            ),
-            risk_level=classify_risk(fraud_probability),
+            result=result,
+            risk_level=risk_level,
             model_type=str(
                 business_artifact.get(
                     "model_type",
@@ -514,6 +646,16 @@ def predict_business_transaction(
                 for key, value in engineered_features.items()
             },
         )
+
+        record_prediction_metrics(
+            endpoint="/predict-business",
+            result=result,
+            risk_level=risk_level,
+            model_version=response.model_version,
+            fraud_probability=response.fraud_probability,
+        )
+
+        return response
 
     except ValueError as error:
         raise HTTPException(
