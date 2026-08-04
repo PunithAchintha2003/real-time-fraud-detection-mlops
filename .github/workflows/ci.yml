@@ -49,10 +49,12 @@ jobs:
         run: |
           python -c "from src.data.preprocessing import preprocess_features; print('preprocessing import OK')"
           python -c "from src.inference.predict import fraud_detection_service; print('inference import OK')"
+          python -c "from src.features.business_features import make_business_features; print('business features import OK')"
 
       - name: Create CI MLflow champion model and local artifacts
         run: |
           python scripts/create_ci_model_artifacts.py
+          python -m src.training.train_business_model
           ls -lah models
           ls -lah mlflow-ci.db
 
