@@ -35,6 +35,10 @@ from src.monitoring.metrics import (
     update_model_metrics,
 )
 
+from src.monitoring.ml_monitoring import (
+    record_business_ml_monitoring_metrics,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -649,6 +653,14 @@ def predict_business_transaction(
 
         record_prediction_metrics(
             endpoint="/predict-business",
+            result=result,
+            risk_level=risk_level,
+            model_version=response.model_version,
+            fraud_probability=response.fraud_probability,
+        )
+
+        record_business_ml_monitoring_metrics(
+            engineered_features=engineered_features,
             result=result,
             risk_level=risk_level,
             model_version=response.model_version,
