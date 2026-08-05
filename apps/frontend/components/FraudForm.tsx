@@ -19,6 +19,7 @@ type BusinessPredictionResponse = {
 
 type FraudFormProps = {
   dark: boolean;
+  onPredictionComplete?: () => void;
 };
 
 const merchantTypes = [
@@ -63,7 +64,7 @@ const deviceTypes = [
   { label: "Other", value: "other" },
 ];
 
-export default function FraudForm({ dark }: FraudFormProps) {
+export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps) {
   const [amount, setAmount] = useState("");
   const [merchantType, setMerchantType] = useState("online_purchase");
   const [location, setLocation] = useState("sri_lanka");
@@ -166,6 +167,7 @@ export default function FraudForm({ dark }: FraudFormProps) {
       const data = (await response.json()) as BusinessPredictionResponse;
 
       setResult(data);
+      onPredictionComplete?.();
     } catch {
       setError("Cannot connect to backend prediction gateway.");
     } finally {
