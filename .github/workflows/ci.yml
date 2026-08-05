@@ -17,7 +17,8 @@ jobs:
 
     env:
       PYTHONUNBUFFERED: "1"
-      MLFLOW_TRACKING_URI: sqlite:///${{ github.workspace }}/mlflow-ci.db
+      PYTHONPATH: ${{ github.workspace }}/apps/ml-service
+      MLFLOW_TRACKING_URI: sqlite:///${{ github.workspace }}/apps/ml-service/mlflow-ci.db
       DOCKER_IMAGE_NAME: achintha2003/real-time-fraud-detection-mlops
 
     steps:
@@ -33,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          key: pip-${{ runner.os }}-${{ hashFiles('apps/ml-service/requirements.txt') }}
           restore-keys: |
             pip-${{ runner.os }}-
 
@@ -43,15 +44,17 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r apps/ml-service/requirements.txt
 
       - name: Run Python import checks
+        working-directory: apps/ml-service
         run: |
           python -c "from src.data.preprocessing import preprocess_features; print('preprocessing import OK')"
           python -c "from src.inference.predict import fraud_detection_service; print('inference import OK')"
           python -c "from src.features.business_features import make_business_features; print('business features import OK')"
 
       - name: Create CI MLflow champion model and local artifacts
+        working-directory: apps/ml-service
         run: |
           python scripts/create_ci_model_artifacts.py
           python -m src.training.train_business_model
@@ -59,12 +62,16 @@ jobs:
           ls -lah mlflow-ci.db
 
       - name: Run tests
+        working-directory: apps/ml-service
         run: |
           pytest -v
 
       - name: Build Docker image for CI
         run: |
-          docker build -t $DOCKER_IMAGE_NAME:ci .
+          docker build \
+            -f infrastructure/docker/Dockerfile.ml-service \
+            -t $DOCKER_IMAGE_NAME:ci \
+            .
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -78,6 +85,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: infrastructure/docker/Dockerfile.ml-service
           push: true
           tags: |
             achintha2003/real-time-fraud-detection-mlops:latest

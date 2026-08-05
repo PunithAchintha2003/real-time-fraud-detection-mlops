@@ -101,7 +101,7 @@ def create_ci_model_artifacts() -> None:
         exist_ok=True,
     )
 
-    tracking_uri = f"sqlite:///{MLFLOW_DB_PATH}"
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", f"sqlite:///{MLFLOW_DB_PATH}")
 
     os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
 
@@ -160,7 +160,7 @@ def create_ci_model_artifacts() -> None:
 
         mlflow.sklearn.log_model(
             sk_model=model,
-            artifact_path="model",
+            name="model",
             registered_model_name=MLFLOW_REGISTERED_MODEL_NAME,
         )
 

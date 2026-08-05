@@ -1,0 +1,38 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    git \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY apps/ml-service/requirements.txt ./requirements.txt
+COPY apps/ml-service/pytest.ini ./pytest.ini
+
+RUN pip install \
+    --no-cache-dir \
+    --upgrade pip && \
+    pip install \
+    --no-cache-dir \
+    -r requirements.txt
+
+COPY apps/ml-service/api ./api
+COPY apps/ml-service/src ./src
+COPY apps/ml-service/scripts ./scripts
+COPY apps/ml-service/tests ./tests
+COPY apps/ml-service/models ./models
+
+RUN mkdir -p /app/data
+RUN mkdir -p /app/models
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
