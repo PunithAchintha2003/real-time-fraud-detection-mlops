@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
+
 type BusinessPredictionResponse = {
   prediction: number;
   is_fraud: boolean;
@@ -142,10 +144,17 @@ export default function FraudForm({ dark }: FraudFormProps) {
     };
 
     try {
-      const response = await fetch("/fastapi/predict-business", {
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        throw new Error("Please login before checking a transaction.");
+      }
+
+      const response = await fetch(`${API_URL}/transactions/check`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -158,7 +167,7 @@ export default function FraudForm({ dark }: FraudFormProps) {
 
       setResult(data);
     } catch {
-      setError("Cannot connect to FastAPI business prediction endpoint.");
+      setError("Cannot connect to backend prediction gateway.");
     } finally {
       setLoading(false);
     }
