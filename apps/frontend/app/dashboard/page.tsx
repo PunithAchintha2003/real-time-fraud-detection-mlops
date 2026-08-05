@@ -1,8 +1,11 @@
 "use client";
 
 import FraudForm from "@/components/FraudForm";
+import TransactionHistory from "@/components/TransactionHistory";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
 
 type User = {
   id: string;
@@ -11,9 +14,70 @@ type User = {
   role: string;
 };
 
+type FraudPrediction = {
+  id: string;
+  prediction: number;
+  isFraud: boolean;
+  fraudProbability: number;
+  threshold: number;
+  result: string;
+  riskLevel: string;
+  modelType: string;
+  modelVersion: string;
+  featuresUsed: number;
+  createdAt: string;
+};
+
+type Transaction = {
+  id: string;
+  amount: number;
+  merchantType: string;
+  location: string;
+  transactionTime: string;
+  paymentMethod: string;
+  deviceType: string;
+  isInternational: boolean;
+  previousFailedAttempts: number;
+  createdAt: string;
+  prediction: FraudPrediction | null;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
+
   const [user, setUser] = useState<User | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadTransactions = useCallback(async () => {
+    const token = localStorage.getItem("accessToken");
+
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setHistoryLoading(true);
+
+      const response = await fetch(`${API_URL}/transactions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load transaction history");
+      }
+
+      const data = (await response.json()) as Transaction[];
+      setTransactions(data);
+    } catch {
+      setTransactions([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -25,7 +89,8 @@ export default function DashboardPage() {
     }
 
     setUser(JSON.parse(savedUser));
-  }, [router]);
+    void loadTransactions();
+  }, [loadTransactions, router]);
 
   function handleLogout() {
     localStorage.removeItem("accessToken");
@@ -64,8 +129,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-6">
-            <FraudForm dark={true} />
+            <FraudForm dark={true} onPredictionComplete={loadTransactions} />
           </div>
+
+          <TransactionHistory
+            transactions={transactions}
+            loading={historyLoading}
+          />
         </div>
       </section>
     </main>
