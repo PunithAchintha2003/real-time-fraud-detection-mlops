@@ -1,0 +1,66 @@
+services:
+  mlflow-server:
+    image: ghcr.io/mlflow/mlflow:v3.14.0
+    container_name: fraud-detection-mlflow
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --allowed-hosts mlflow-server:5000,fraud-detection-mlflow:5000,localhost:*,127.0.0.1:*
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --serve-artifacts
+      --artifacts-destination /mlflow/artifacts
+      --default-artifact-root mlflow-artifacts:/
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  fraud-api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.ml-service
+    image: real-time-fraud-detection-mlops-fraud-api:latest
+    container_name: fraud-detection-api
+    restart: unless-stopped
+    depends_on:
+      mlflow-server:
+        condition: service_healthy
+      trainer:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: "/app"
+      MLFLOW_TRACKING_URI: "http://mlflow-server:5000"
+    volumes:
+      - ../../apps/ml-service/models:/app/models
+
+  trainer:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.ml-service
+    image: real-time-fraud-detection-mlops-trainer:latest
+    container_name: fraud-detection-trainer
+    depends_on:
+      mlflow-server:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: "/app"
+      MLFLOW_TRACKING_URI: "http://mlflow-server:5000"
+    volumes:
+      - ../../apps/ml-service/data:/app/data
+      - ../../apps/ml-service/models:/app/models
+    command: ["python", "scripts/create_ci_model_artifacts.py"]
+
+volumes:
+  mlflow-data:

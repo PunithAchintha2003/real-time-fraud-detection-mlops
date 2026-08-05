@@ -1,82 +1,88 @@
-# PYTHON
+# Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 
-# VIRTUAL ENVIRONMENTS
+# Virtual environments
 .venv/
 venv/
 env/
 
-# NODE.JS
+# Node.js
 node_modules/
+**/node_modules/
 .pnpm-store/
 .npm/
 
-# NEXT.JS
+# Next.js
 .next/
+**/.next/
 out/
 
-# NESTJS
+# NestJS / TypeScript builds
 dist/
+**/dist/
 
-# GIT
-.git/
-
-# MACOS
-.DS_Store
-
-# IDE
-.vscode/
-.idea/
-
-# TESTING
+# Testing / coverage
 .pytest_cache/
 .coverage
 htmlcov/
 coverage/
 
-# LOGS
+# Logs
 *.log
+logs/
 
-# ENVIRONMENT VARIABLES
+# Environment variables
 .env
 .env.local
 .env.development.local
 .env.production.local
+.env.*
+!.env.example
 
-# TEMP FILES
+# Temporary files
 *.tmp
 *.swp
 *.swo
 
-# MLFLOW
+# MLflow
 mlartifacts/
-
-# Uncomment these if you DO NOT want to commit
-# the local MLflow database.
-# mlflow.db
-# mlflow.db-shm
-# mlflow.db-wal
-# mlruns/
-
-# ML ARTIFACTS
-/data/
-/models/
-
-# DOCKER
-docker-data/
-
-# OS
-Thumbs.db
-
-# LOCAL MLFLOW STATE
+mlruns/
+mlruns-ci/
 mlflow.db
 mlflow.db-shm
 mlflow.db-wal
 mlflow-ci.db
 mlflow-ci.db-shm
 mlflow-ci.db-wal
-mlruns/
-mlruns-ci/
+
+apps/ml-service/mlruns/
+apps/ml-service/mlruns-ci/
+apps/ml-service/mlflow.db
+apps/ml-service/mlflow.db-shm
+apps/ml-service/mlflow.db-wal
+apps/ml-service/mlflow-ci.db
+apps/ml-service/mlflow-ci.db-shm
+apps/ml-service/mlflow-ci.db-wal
+
+# ML data and model artifacts
+/data/
+/models/
+
+apps/ml-service/data/*
+!apps/ml-service/data/.gitkeep
+
+apps/ml-service/models/*
+!apps/ml-service/models/.gitkeep
+
+# Docker local data
+docker-data/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
