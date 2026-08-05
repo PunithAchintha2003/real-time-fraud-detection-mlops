@@ -267,8 +267,8 @@ export default function FraudForm({ dark }: FraudFormProps) {
         <div
           className={
             dark
-              ? "flex h-[70px] items-center justify-between rounded-xl border border-white/10 bg-black/40 px-4"
-              : "flex h-[70px] items-center justify-between rounded-xl border border-black/10 bg-white px-4"
+              ? "flex h-17.5 items-center justify-between rounded-xl border border-white/10 bg-black/40 px-4"
+              : "flex h-17.5 items-center justify-between rounded-xl border border-black/10 bg-white px-4"
           }
         >
           <div>

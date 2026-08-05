@@ -1,4 +1,22 @@
 services:
+  backend-postgres:
+    image: postgres:16-alpine
+    container_name: fraud-detection-postgres
+    restart: unless-stopped
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_USER: fraud_user
+      POSTGRES_PASSWORD: fraud_password
+      POSTGRES_DB: fraud_auth_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fraud_user -d fraud_auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   mlflow-server:
     image: ghcr.io/mlflow/mlflow:v3.14.0
     container_name: fraud-detection-mlflow
@@ -63,4 +81,5 @@ services:
     command: ["python", "scripts/create_ci_model_artifacts.py"]
 
 volumes:
+  postgres-data:
   mlflow-data:

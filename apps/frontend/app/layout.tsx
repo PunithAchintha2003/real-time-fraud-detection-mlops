@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Fraud Detection AI",
-  description: "Real Time Fraud Detection System",
+  title: "Real-Time Fraud Detection MLOps",
+  description: "Real-time fraud detection dashboard with ML-powered predictions.",
 };
 
 export default function RootLayout({
