@@ -20,3 +20,24 @@ button,
 input {
   font-family: inherit;
 }
+
+/* App background / overscroll fix */
+html,
+body {
+  min-height: 100%;
+  background: #020617;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100vh;
+  color: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.35);
+}
