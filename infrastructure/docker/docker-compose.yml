@@ -41,6 +41,24 @@ services:
       retries: 12
       start_period: 20s
 
+  trainer:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.ml-service
+    image: real-time-fraud-detection-mlops-trainer:latest
+    container_name: fraud-detection-trainer
+    depends_on:
+      mlflow-server:
+        condition: service_healthy
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: "/app"
+      MLFLOW_TRACKING_URI: "http://mlflow-server:5000"
+    volumes:
+      - ../../apps/ml-service/data:/app/data
+      - ../../apps/ml-service/models:/app/models
+    command: ["python", "scripts/create_ci_model_artifacts.py"]
+
   fraud-api:
     build:
       context: ../..
@@ -62,23 +80,77 @@ services:
     volumes:
       - ../../apps/ml-service/models:/app/models
 
-  trainer:
+  backend-migrate:
     build:
       context: ../..
-      dockerfile: infrastructure/docker/Dockerfile.ml-service
-    image: real-time-fraud-detection-mlops-trainer:latest
-    container_name: fraud-detection-trainer
+      dockerfile: infrastructure/docker/Dockerfile.backend
+      target: builder
+    image: real-time-fraud-detection-mlops-backend-migrate:latest
+    container_name: fraud-detection-backend-migrate
     depends_on:
-      mlflow-server:
+      backend-postgres:
         condition: service_healthy
     environment:
-      PYTHONUNBUFFERED: "1"
-      PYTHONPATH: "/app"
-      MLFLOW_TRACKING_URI: "http://mlflow-server:5000"
-    volumes:
-      - ../../apps/ml-service/data:/app/data
-      - ../../apps/ml-service/models:/app/models
-    command: ["python", "scripts/create_ci_model_artifacts.py"]
+      DATABASE_URL: "postgresql://fraud_user:fraud_password@backend-postgres:5432/fraud_auth_db?schema=public"
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.backend
+      target: runner
+    image: real-time-fraud-detection-mlops-backend:latest
+    container_name: fraud-detection-backend
+    restart: unless-stopped
+    depends_on:
+      backend-postgres:
+        condition: service_healthy
+      backend-migrate:
+        condition: service_completed_successfully
+      fraud-api:
+        condition: service_started
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: "production"
+      PORT: "4000"
+      DATABASE_URL: "postgresql://fraud_user:fraud_password@backend-postgres:5432/fraud_auth_db?schema=public"
+      JWT_SECRET: "dev_super_secret_change_later"
+      JWT_EXPIRES_IN: "1d"
+      ML_SERVICE_URL: "http://fraud-api:8000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.frontend
+      target: runner
+      args:
+        NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
+    image: real-time-fraud-detection-mlops-frontend:latest
+    container_name: fraud-detection-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: "production"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
 volumes:
   postgres-data:
