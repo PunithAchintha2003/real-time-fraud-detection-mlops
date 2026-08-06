@@ -90,3 +90,42 @@ Dashboard folder:
 Dashboard name:
 
 - `Fraud Detection Observability`
+
+## ML Monitoring v2
+
+ML monitoring metrics are exposed by the FastAPI ML service and scraped by Prometheus.
+
+Key metrics:
+
+- `ml_business_predictions_total`
+- `ml_business_fraud_rate`
+- `ml_business_legitimate_rate`
+- `ml_business_prediction_window_size`
+- `ml_business_amount_distribution`
+- `ml_business_probability_distribution`
+- `ml_business_risk_score_distribution`
+- `ml_business_feature_drift_score`
+- `ml_business_drift_alerts_total`
+
+Useful ML monitoring queries:
+
+    ml_business_prediction_window_size
+
+    ml_business_fraud_rate
+
+    ml_business_legitimate_rate
+
+    sum by (result, risk_level) (rate(ml_business_predictions_total[5m]))
+
+    histogram_quantile(0.95, rate(ml_business_probability_distribution_bucket[5m]))
+
+    histogram_quantile(0.95, rate(ml_business_amount_distribution_bucket[5m]))
+
+    histogram_quantile(0.95, rate(ml_business_risk_score_distribution_bucket[5m]))
+
+    max by (feature) (ml_business_feature_drift_score)
+
+    sum(increase(ml_business_drift_alerts_total[15m]))
+
+The Grafana dashboard includes ML Monitoring v2 panels for prediction volume, fraud rate, legitimate rate, probability distribution, transaction amount distribution, risk score distribution, and feature drift scores.
+
