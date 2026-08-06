@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: fraud-detection
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: achintha2003/fraud-backend:k8s-cors
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: fraud-detection-config
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: fraud-detection-config
+                  key: PORT
+            - name: ML_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: fraud-detection-config
+                  key: ML_SERVICE_URL
+            - name: CORS_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: fraud-detection-config
+                  key: CORS_ORIGIN
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fraud-detection-secret
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: fraud-detection-secret
+                  key: JWT_SECRET
+            - name: JWT_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: fraud-detection-secret
+                  key: JWT_EXPIRES_IN
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 4000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 4000
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: fraud-detection
+spec:
+  type: NodePort
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 4000
+      targetPort: 4000
+      nodePort: 30040

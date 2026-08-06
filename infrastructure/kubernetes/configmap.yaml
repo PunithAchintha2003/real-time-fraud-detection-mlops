@@ -4,6 +4,12 @@ metadata:
   name: fraud-detection-config
   namespace: fraud-detection
 data:
+  NODE_ENV: production
   PYTHONUNBUFFERED: "1"
-  ENVIRONMENT: "kubernetes"
-  MLFLOW_TRACKING_URI: "sqlite:////app/mlflow.db"
+  PYTHONPATH: /app
+  ENVIRONMENT: kubernetes
+  PORT: "4000"
+  ML_SERVICE_URL: http://fraud-detection-api-service:8000
+  MLFLOW_TRACKING_URI: http://mlflow-service:5000
+  NEXT_PUBLIC_BACKEND_URL: http://localhost:30040
+  CORS_ORIGIN: http://localhost:3000,http://localhost:3001,http://localhost:30030,http://localhost:33030
