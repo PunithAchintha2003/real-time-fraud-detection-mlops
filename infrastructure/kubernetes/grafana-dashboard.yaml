@@ -30,7 +30,7 @@ data:
       "tags": ["fraud-detection", "mlops", "kubernetes"],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "refresh": "10s",
       "panels": [
         {
@@ -149,6 +149,133 @@ data:
               "datasource": { "type": "prometheus", "uid": "Prometheus" },
               "expr": "rate(process_cpu_seconds_total{job=\"fraud-ml-service\"}[5m])",
               "legendFormat": "ml cpu"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "ML Prediction Window Size",
+          "gridPos": { "x": 0, "y": 20, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "ml_business_prediction_window_size",
+              "legendFormat": "window size"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "type": "stat",
+          "title": "ML Fraud Rate",
+          "gridPos": { "x": 6, "y": 20, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "ml_business_fraud_rate",
+              "legendFormat": "fraud rate"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            }
+          }
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "ML Legitimate Rate",
+          "gridPos": { "x": 12, "y": 20, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "ml_business_legitimate_rate",
+              "legendFormat": "legitimate rate"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            }
+          }
+        },
+        {
+          "id": 12,
+          "type": "stat",
+          "title": "ML Drift Alerts 15m",
+          "gridPos": { "x": 18, "y": 20, "w": 6, "h": 4 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum(increase(ml_business_drift_alerts_total[15m]))",
+              "legendFormat": "drift alerts"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "timeseries",
+          "title": "ML Business Prediction Rate",
+          "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "sum by (result, risk_level) (rate(ml_business_predictions_total[5m]))",
+              "legendFormat": "{{result}} {{risk_level}}"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "timeseries",
+          "title": "ML Fraud Probability p95",
+          "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, rate(ml_business_probability_distribution_bucket[5m]))",
+              "legendFormat": "probability p95"
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "type": "timeseries",
+          "title": "ML Amount Distribution p95",
+          "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, rate(ml_business_amount_distribution_bucket[5m]))",
+              "legendFormat": "amount p95"
+            }
+          ]
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "ML Risk Score p95",
+          "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "histogram_quantile(0.95, rate(ml_business_risk_score_distribution_bucket[5m]))",
+              "legendFormat": "risk score p95"
+            }
+          ]
+        },
+        {
+          "id": 17,
+          "type": "timeseries",
+          "title": "ML Feature Drift Scores",
+          "gridPos": { "x": 0, "y": 40, "w": 24, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Prometheus" },
+              "expr": "max by (feature) (ml_business_feature_drift_score)",
+              "legendFormat": "{{feature}}"
             }
           ]
         }
