@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: achintha2003/fraud-backend:k8s-cors
+          image: achintha2003/fraud-backend:k8s-metrics
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4000
