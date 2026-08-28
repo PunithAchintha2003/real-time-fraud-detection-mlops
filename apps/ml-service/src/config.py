@@ -164,3 +164,35 @@ SCALED_FEATURES = [
     "Time",
     "Amount",
 ]
+
+# BUSINESS MODEL MLFLOW CONFIGURATION
+
+BUSINESS_MODEL_PATH = (
+    MODELS_DIR / "business_fraud_model.joblib"
+)
+
+BUSINESS_RETRAINING_REPORT_PATH = (
+    MODELS_DIR / "business_retraining_report.json"
+)
+
+BUSINESS_MLFLOW_EXPERIMENT_NAME = os.getenv(
+    "BUSINESS_MLFLOW_EXPERIMENT_NAME",
+    "business-fraud-retraining"
+)
+
+BUSINESS_MLFLOW_REGISTERED_MODEL_NAME = os.getenv(
+    "BUSINESS_MLFLOW_REGISTERED_MODEL_NAME",
+    "BusinessFraudDetectionModel"
+)
+
+BUSINESS_MLFLOW_MODEL_ALIAS = os.getenv(
+    "BUSINESS_MLFLOW_MODEL_ALIAS",
+    "champion"
+)
+
+BUSINESS_FRAUD_THRESHOLD = float(
+    os.getenv(
+        "BUSINESS_FRAUD_THRESHOLD",
+        "0.5"
+    )
+)

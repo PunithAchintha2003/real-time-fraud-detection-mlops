@@ -1,0 +1,78 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: business-fraud-model-retrainer
+  namespace: fraud-detection
+spec:
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: business-fraud-model-retrainer
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: retrainer
+              image: achintha2003/fraud-ml-service:k8s
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - -m
+                - src.training.retrain_business_model
+              env:
+                - name: PYTHONUNBUFFERED
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: PYTHONUNBUFFERED
+
+                - name: PYTHONPATH
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: PYTHONPATH
+
+                - name: MLFLOW_TRACKING_URI
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: MLFLOW_TRACKING_URI
+
+                - name: BUSINESS_MLFLOW_EXPERIMENT_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: BUSINESS_MLFLOW_EXPERIMENT_NAME
+
+                - name: BUSINESS_MLFLOW_REGISTERED_MODEL_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: BUSINESS_MLFLOW_REGISTERED_MODEL_NAME
+
+                - name: BUSINESS_MLFLOW_MODEL_ALIAS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: BUSINESS_MLFLOW_MODEL_ALIAS
+
+                - name: BUSINESS_RETRAIN_ROWS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fraud-detection-config
+                      key: BUSINESS_RETRAIN_ROWS
+
+              volumeMounts:
+                - name: model-storage
+                  mountPath: /app/models
+
+          volumes:
+            - name: model-storage
+              persistentVolumeClaim:
+                claimName: ml-models-pvc

@@ -49,6 +49,7 @@ BUSINESS_MODEL_PATH = (
 )
 
 business_artifact: dict[str, Any] | None = None
+business_model_mtime_ns: int | None = None
 
 
 def load_business_model() -> dict[str, Any] | None:
@@ -79,25 +80,69 @@ def ensure_fraud_model_loaded() -> bool:
 
 def ensure_business_model_loaded() -> bool:
     global business_artifact
+    global business_model_mtime_ns
 
-    if business_artifact is not None:
+    if not BUSINESS_MODEL_PATH.exists():
+        if business_artifact is not None:
+            print(
+                "WARNING: Business model file is temporarily unavailable. "
+                "Keeping the last successfully loaded model."
+            )
+            return True
+
+        return False
+
+    current_mtime_ns = (
+        BUSINESS_MODEL_PATH.stat().st_mtime_ns
+    )
+
+    if (
+        business_artifact is not None
+        and business_model_mtime_ns == current_mtime_ns
+    ):
         return True
 
-    try:
-        business_artifact = load_business_model()
+    previous_artifact = business_artifact
 
-        if business_artifact is not None:
+    try:
+        loaded_artifact = load_business_model()
+
+        if loaded_artifact is None:
+            return previous_artifact is not None
+
+        business_artifact = loaded_artifact
+        business_model_mtime_ns = current_mtime_ns
+
+        if previous_artifact is None:
             print("Business fraud model loaded.")
 
+        else:
+            print(
+                "Business fraud model hot-reloaded. "
+                f"Version: "
+                f"{business_artifact.get('model_version', 'Unknown')}"
+            )
+
+        return True
+
     except Exception as error:
+        if previous_artifact is not None:
+            print(
+                "WARNING: Failed to reload business fraud model. "
+                "Keeping the last successfully loaded model. "
+                f"Error: {error}"
+            )
+            return True
+
         business_artifact = None
+        business_model_mtime_ns = None
 
         print(
             "ERROR: Failed to load business fraud model: "
             f"{error}"
         )
 
-    return business_artifact is not None
+        return False
 
 
 def get_model_version() -> str | None:
