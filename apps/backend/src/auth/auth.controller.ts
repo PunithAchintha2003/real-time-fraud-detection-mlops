@@ -1,5 +1,14 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -23,15 +32,63 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.login(loginDto);
+
+    this.setRefreshTokenCookie(response, result.refreshToken);
+
+    const { refreshToken, ...body } = result;
+
+    void refreshToken;
+
+    return body;
+  }
+
+  @Post('refresh')
+  refresh(@Req() request: Request) {
+    const refreshToken = request.cookies?.refreshToken as string | undefined;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is missing');
+    }
+
+    return this.authService.refreshAccessToken(refreshToken);
+  }
+
+  @Post('logout')
+  logout(@Res({ passthrough: true }) response: Response) {
+    response.clearCookie('refreshToken', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/auth',
+    });
+
+    return {
+      message: 'Logout successful',
+    };
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() request: AuthenticatedRequest) {
+  async me(@Req() request: AuthenticatedRequest) {
+    const user = await this.authService.getProfile(request.user.sub);
+
     return {
-      user: request.user,
+      user,
     };
+  }
+
+  private setRefreshTokenCookie(response: Response, refreshToken: string) {
+    response.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/auth',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
   }
 }

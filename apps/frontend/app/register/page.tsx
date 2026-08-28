@@ -1,10 +1,12 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
+const API_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,17 +17,20 @@ export default function RegisterPage() {
     password: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setLoading(true);
     setError("");
 
     try {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -35,7 +40,11 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message ?? "Registration failed");
+        throw new Error(
+          Array.isArray(data.message)
+            ? data.message.join(", ")
+            : (data.message ?? "Registration failed"),
+        );
       }
 
       router.push("/login");
@@ -78,8 +87,13 @@ export default function RegisterPage() {
                   <p className="text-xl font-bold text-cyan-600 dark:text-cyan-300">
                     {item}
                   </p>
+
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {item === "JWT" ? "Auth" : item === "Prisma" ? "ORM" : "DB"}
+                    {item === "JWT"
+                      ? "Auth"
+                      : item === "Prisma"
+                        ? "ORM"
+                        : "DB"}
                   </p>
                 </div>
               ))}
@@ -91,46 +105,92 @@ export default function RegisterPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-600 dark:text-cyan-300">
                 Register
               </p>
+
               <h2 className="mt-3 text-3xl font-bold">Create account</h2>
+
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                 Start using the fraud detection platform.
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(event) =>
-                  setFormData({ ...formData, name: event.target.value })
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-cyan-400"
-                placeholder="Full name"
-                required
-              />
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Full name
+                </label>
 
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(event) =>
-                  setFormData({ ...formData, email: event.target.value })
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-cyan-400"
-                placeholder="Email address"
-                required
-              />
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      name: event.target.value,
+                    })
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-cyan-400"
+                  placeholder="Full name"
+                  required
+                />
+              </div>
 
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(event) =>
-                  setFormData({ ...formData, password: event.target.value })
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-cyan-400"
-                placeholder="Minimum 8 characters"
-                minLength={8}
-                required
-              />
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Email address
+                </label>
+
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      email: event.target.value,
+                    })
+                  }
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-cyan-400"
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Password
+                </label>
+
+                <div className="relative mt-2">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        password: event.target.value,
+                      })
+                    }
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/20 dark:border-slate-700 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-600 dark:focus:border-cyan-400"
+                    placeholder="Minimum 8 characters"
+                    minLength={8}
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-slate-500 transition hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-300"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} />
+                    ) : (
+                      <Eye size={20} />
+                    )}
+                  </button>
+                </div>
+              </div>
 
               {error && (
                 <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
@@ -149,7 +209,10 @@ export default function RegisterPage() {
 
             <p className="mt-7 text-center text-sm text-slate-600 dark:text-slate-400">
               Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-cyan-600 dark:text-cyan-300">
+              <Link
+                href="/login"
+                className="font-semibold text-cyan-600 dark:text-cyan-300"
+              >
                 Login
               </Link>
             </p>

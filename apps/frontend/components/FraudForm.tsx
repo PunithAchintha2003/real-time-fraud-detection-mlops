@@ -1,8 +1,10 @@
 "use client";
 
+import { authFetch } from "@/lib/api";
 import { FormEvent, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
+const API_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
 
 type BusinessPredictionResponse = {
   prediction: number;
@@ -64,7 +66,10 @@ const deviceTypes = [
   { label: "Other", value: "other" },
 ];
 
-export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps) {
+export default function FraudForm({
+  dark,
+  onPredictionComplete,
+}: FraudFormProps) {
   const [amount, setAmount] = useState("");
   const [merchantType, setMerchantType] = useState("online_purchase");
   const [location, setLocation] = useState("sri_lanka");
@@ -76,7 +81,8 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<BusinessPredictionResponse | null>(null);
+  const [result, setResult] =
+    useState<BusinessPredictionResponse | null>(null);
 
   const labelClass = dark
     ? "mb-1 block text-xs font-semibold text-white/70"
@@ -145,31 +151,46 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
     };
 
     try {
-      const token = localStorage.getItem("accessToken");
-
-      if (!token) {
-        throw new Error("Please login before checking a transaction.");
-      }
-
-      const response = await fetch(`${API_URL}/transactions/check`, {
+      const response = await authFetch(`${API_URL}/transactions/check`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
 
+      if (response.status === 401) {
+        throw new Error("Your session has expired. Please login again.");
+      }
+
       if (!response.ok) {
-        throw new Error("Prediction request failed.");
+        let message = "Prediction request failed.";
+
+        try {
+          const errorData = await response.json();
+
+          if (typeof errorData.message === "string") {
+            message = errorData.message;
+          } else if (Array.isArray(errorData.message)) {
+            message = errorData.message.join(", ");
+          }
+        } catch {
+          // Keep the default error message.
+        }
+
+        throw new Error(message);
       }
 
       const data = (await response.json()) as BusinessPredictionResponse;
 
       setResult(data);
       onPredictionComplete?.();
-    } catch {
-      setError("Cannot connect to backend prediction gateway.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Cannot connect to backend prediction gateway.",
+      );
     } finally {
       setLoading(false);
     }
@@ -180,6 +201,7 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelClass}>Transaction Amount</label>
+
           <input
             type="number"
             step="any"
@@ -194,6 +216,7 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
         <div>
           <label className={labelClass}>Transaction Time</label>
+
           <input
             type="time"
             value={transactionTime}
@@ -205,6 +228,7 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
         <div>
           <label className={labelClass}>Merchant Type</label>
+
           <select
             value={merchantType}
             onChange={(event) => setMerchantType(event.target.value)}
@@ -220,6 +244,7 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
         <div>
           <label className={labelClass}>Location</label>
+
           <select
             value={location}
             onChange={(event) => setLocation(event.target.value)}
@@ -235,6 +260,7 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
         <div>
           <label className={labelClass}>Payment Method</label>
+
           <select
             value={paymentMethod}
             onChange={(event) => setPaymentMethod(event.target.value)}
@@ -250,6 +276,7 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
         <div>
           <label className={labelClass}>Device Type</label>
+
           <select
             value={deviceType}
             onChange={(event) => setDeviceType(event.target.value)}
@@ -265,11 +292,14 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
 
         <div>
           <label className={labelClass}>Failed Payment Attempts</label>
+
           <input
             type="number"
             min="0"
             value={failedPaymentAttempts}
-            onChange={(event) => setFailedPaymentAttempts(event.target.value)}
+            onChange={(event) =>
+              setFailedPaymentAttempts(event.target.value)
+            }
             className={inputClass}
             placeholder="0"
           />
@@ -285,8 +315,12 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
           <div>
             <p className="text-sm font-semibold">International Payment</p>
 
-            <p className={dark ? "text-xs text-white/50" : "text-xs text-black/50"}>
-              Payment is outside the customer’s home country
+            <p
+              className={
+                dark ? "text-xs text-white/50" : "text-xs text-black/50"
+              }
+            >
+              Payment is outside the customer&apos;s home country
             </p>
           </div>
 
@@ -315,10 +349,11 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
         <button
           type="button"
           onClick={clearForm}
+          disabled={loading}
           className={
             dark
-              ? "h-11 rounded-xl border border-white/15 bg-transparent text-sm font-semibold text-white/80 transition hover:bg-white/10"
-              : "h-11 rounded-xl border border-black/10 bg-transparent text-sm font-semibold text-black/70 transition hover:bg-black/5"
+              ? "h-11 rounded-xl border border-white/15 bg-transparent text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              : "h-11 rounded-xl border border-black/10 bg-transparent text-sm font-semibold text-black/70 transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60"
           }
         >
           Clear
@@ -352,7 +387,9 @@ export default function FraudForm({ dark, onPredictionComplete }: FraudFormProps
               </p>
 
               <h2 className="mt-1 text-2xl font-bold">
-                {result.is_fraud ? "Fraud Detected" : "Legitimate Transaction"}
+                {result.is_fraud
+                  ? "Fraud Detected"
+                  : "Legitimate Transaction"}
               </h2>
             </div>
 
