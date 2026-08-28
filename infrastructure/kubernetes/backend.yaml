@@ -27,36 +27,55 @@ spec:
                 configMapKeyRef:
                   name: fraud-detection-config
                   key: NODE_ENV
+
             - name: PORT
               valueFrom:
                 configMapKeyRef:
                   name: fraud-detection-config
                   key: PORT
+
             - name: ML_SERVICE_URL
               valueFrom:
                 configMapKeyRef:
                   name: fraud-detection-config
                   key: ML_SERVICE_URL
+
             - name: CORS_ORIGIN
               valueFrom:
                 configMapKeyRef:
                   name: fraud-detection-config
                   key: CORS_ORIGIN
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: fraud-detection-secret
                   key: DATABASE_URL
+
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: fraud-detection-secret
                   key: JWT_SECRET
+
             - name: JWT_EXPIRES_IN
               valueFrom:
                 secretKeyRef:
                   name: fraud-detection-secret
                   key: JWT_EXPIRES_IN
+
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: fraud-detection-secret
+                  key: JWT_REFRESH_SECRET
+
+            - name: JWT_REFRESH_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: fraud-detection-secret
+                  key: JWT_REFRESH_EXPIRES_IN
+
           readinessProbe:
             httpGet:
               path: /
@@ -64,6 +83,7 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             failureThreshold: 12
+
           livenessProbe:
             httpGet:
               path: /

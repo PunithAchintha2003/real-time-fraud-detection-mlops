@@ -115,8 +115,10 @@ services:
       NODE_ENV: "production"
       PORT: "4000"
       DATABASE_URL: "postgresql://fraud_user:fraud_password@backend-postgres:5432/fraud_auth_db?schema=public"
-      JWT_SECRET: "dev_super_secret_change_later"
-      JWT_EXPIRES_IN: "1d"
+      JWT_SECRET: "dev_access_secret_change_later"
+      JWT_EXPIRES_IN: "15m"
+      JWT_REFRESH_SECRET: "dev_refresh_secret_change_later"
+      JWT_REFRESH_EXPIRES_IN: "7d"
       ML_SERVICE_URL: "http://fraud-api:8000"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]

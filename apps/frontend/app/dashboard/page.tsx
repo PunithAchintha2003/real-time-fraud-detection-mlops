@@ -2,10 +2,12 @@
 
 import FraudForm from "@/components/FraudForm";
 import TransactionHistory from "@/components/TransactionHistory";
+import { authFetch, logout } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
+const API_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
 
 type User = {
   id: string;
@@ -48,29 +50,27 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
 
   const loadTransactions = useCallback(async () => {
-    const token = localStorage.getItem("accessToken");
-
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     try {
       setHistoryLoading(true);
 
-      const response = await fetch(`${API_URL}/transactions`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await authFetch(`${API_URL}/transactions`);
+
+      if (response.status === 401) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
+        router.replace("/login");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Failed to load transaction history");
       }
 
       const data = (await response.json()) as Transaction[];
+
       setTransactions(data);
     } catch {
       setTransactions([]);
@@ -80,22 +80,54 @@ export default function DashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    const savedUser = localStorage.getItem("user");
+    async function loadDashboard() {
+      try {
+        const response = await authFetch(`${API_URL}/auth/me`);
 
-    if (!token || !savedUser) {
-      router.push("/login");
-      return;
+        if (!response.ok) {
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("user");
+          router.replace("/login");
+          return;
+        }
+
+        const data = (await response.json()) as {
+          user: User;
+        };
+
+        setUser(data.user);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        await loadTransactions();
+      } catch {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
+        router.replace("/login");
+      } finally {
+        setPageLoading(false);
+      }
     }
 
-    setUser(JSON.parse(savedUser));
-    void loadTransactions();
+    void loadDashboard();
   }, [loadTransactions, router]);
 
-  function handleLogout() {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
-    router.push("/login");
+  async function handleLogout() {
+    await logout();
+    router.replace("/login");
+  }
+
+  if (pageLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-cyan-400" />
+
+          <p className="mt-4 text-sm text-slate-400">
+            Loading dashboard...
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -121,7 +153,8 @@ export default function DashboardPage() {
             </div>
 
             <button
-              onClick={handleLogout}
+              type="button"
+              onClick={() => void handleLogout()}
               className="rounded-xl border border-slate-700 bg-slate-950/40 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
             >
               Logout
@@ -129,7 +162,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-6">
-            <FraudForm dark={true} onPredictionComplete={loadTransactions} />
+            <FraudForm
+              dark={true}
+              onPredictionComplete={() => {
+                void loadTransactions();
+              }}
+            />
           </div>
 
           <TransactionHistory
