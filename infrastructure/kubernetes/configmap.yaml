@@ -13,3 +13,7 @@ data:
   MLFLOW_TRACKING_URI: http://mlflow-service:5000
   NEXT_PUBLIC_BACKEND_URL: http://localhost:30040
   CORS_ORIGIN: http://localhost:3000,http://localhost:3001,http://localhost:30030,http://localhost:33030
+  BUSINESS_MLFLOW_EXPERIMENT_NAME: business-fraud-retraining
+  BUSINESS_MLFLOW_REGISTERED_MODEL_NAME: BusinessFraudDetectionModel
+  BUSINESS_MLFLOW_MODEL_ALIAS: champion
+  BUSINESS_RETRAIN_ROWS: "25000"
