@@ -548,7 +548,14 @@ def health_check():
         },
         "business_model": {
             "model_loaded": business_model_loaded,
-            "model_path": str(BUSINESS_MODEL_PATH),
+            "model_source": (
+                business_artifact.get(
+                    "model_source",
+                    "local",
+                )
+                if business_artifact is not None
+                else "unknown"
+            ),
             "model_version": (
                 str(
                     business_artifact.get(
