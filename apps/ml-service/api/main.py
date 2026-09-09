@@ -52,13 +52,184 @@ business_artifact: dict[str, Any] | None = None
 business_model_mtime_ns: int | None = None
 
 
-def load_business_model() -> dict[str, Any] | None:
+def load_business_model_from_mlflow() -> dict[str, Any]:
+    model_uri = (
+        f"models:/{BUSINESS_MLFLOW_REGISTERED_MODEL_NAME}"
+        f"@{BUSINESS_MLFLOW_MODEL_ALIAS}"
+    )
+
+    print(
+        f"Loading business model from MLflow: {model_uri}"
+    )
+
+    client = MlflowClient(
+        tracking_uri=MLFLOW_TRACKING_URI
+    )
+
+    model_version_info = client.get_model_version_by_alias(
+        name=BUSINESS_MLFLOW_REGISTERED_MODEL_NAME,
+        alias=BUSINESS_MLFLOW_MODEL_ALIAS,
+    )
+
+    model_version = str(model_version_info.version)
+
+    print(
+        "Business Champion model version: "
+        f"{model_version}"
+    )
+
+    model = mlflow.sklearn.load_model(model_uri)
+
+    metrics: dict[str, Any] = {}
+
+    for metric_name in (
+        "precision",
+        "recall",
+        "f1_score",
+        "roc_auc",
+        "fraud_rate",
+        "rows",
+    ):
+        tag_value = model_version_info.tags.get(metric_name)
+
+        if tag_value is None:
+            continue
+
+        try:
+            metrics[metric_name] = float(tag_value)
+        except (TypeError, ValueError):
+            metrics[metric_name] = tag_value
+
+    return {
+        "model": model,
+        "feature_columns": BUSINESS_FEATURE_COLUMNS,
+        "threshold": BUSINESS_FRAUD_THRESHOLD,
+        "model_type": type(model).__name__,
+        "model_version": model_version,
+        "model_source": "mlflow",
+        "metrics": metrics,
+    }
+
+
+def load_business_model_local() -> dict[str, Any] | None:
     if not BUSINESS_MODEL_PATH.exists():
         return None
 
-    artifact = joblib.load(BUSINESS_MODEL_PATH)
+    return joblib.load(BUSINESS_MODEL_PATH)
 
-    return artifact
+
+def ensure_business_model_loaded() -> bool:
+    global business_artifact
+    global business_model_mtime_ns
+
+    current_mtime_ns = (
+        BUSINESS_MODEL_PATH.stat().st_mtime_ns
+        if BUSINESS_MODEL_PATH.exists()
+        else None
+    )
+
+    is_test_or_overridden_path = (
+        BUSINESS_MODEL_PATH
+        != PROJECT_ROOT / "models" / "business_fraud_model.joblib"
+    )
+
+    if is_test_or_overridden_path:
+        if (
+            business_artifact is not None
+            and business_model_mtime_ns == current_mtime_ns
+        ):
+            return True
+
+        previous_artifact = business_artifact
+
+        try:
+            loaded_artifact = load_business_model_local()
+
+            if loaded_artifact is None:
+                return previous_artifact is not None
+
+            business_artifact = loaded_artifact
+            business_model_mtime_ns = current_mtime_ns
+
+            print(
+                "Business fraud model loaded/hot-reloaded locally."
+            )
+
+            return True
+
+        except Exception as error:
+            print(
+                "ERROR: Failed to load business fraud model: "
+                f"{error}"
+            )
+
+            if previous_artifact is not None:
+                business_artifact = previous_artifact
+                return True
+
+            business_artifact = None
+            business_model_mtime_ns = None
+            return False
+
+    if (
+        business_artifact is not None
+        and business_artifact.get("model_source") == "mlflow"
+    ):
+        return True
+
+    try:
+        loaded_artifact = load_business_model_from_mlflow()
+
+        business_artifact = loaded_artifact
+        business_model_mtime_ns = current_mtime_ns
+
+        print(
+            "Business Champion model loaded successfully "
+            "from MLflow."
+        )
+
+        return True
+
+    except Exception as mlflow_error:
+        print(
+            "WARNING: Failed to load Business Champion "
+            f"model from MLflow: {mlflow_error}"
+        )
+
+        if business_artifact is not None:
+            print(
+                "Keeping the last successfully loaded "
+                "business model."
+            )
+            return True
+
+        try:
+            loaded_artifact = load_business_model_local()
+
+            if loaded_artifact is None:
+                return False
+
+            business_artifact = loaded_artifact
+            business_model_mtime_ns = (
+                BUSINESS_MODEL_PATH.stat().st_mtime_ns
+            )
+
+            print(
+                "Local business model loaded as fallback."
+            )
+
+            return True
+
+        except Exception as local_error:
+            print(
+                "ERROR: Failed to load business fraud "
+                f"model: {local_error}"
+            )
+
+            business_artifact = None
+            business_model_mtime_ns = None
+
+            return False
 
 
 def ensure_fraud_model_loaded() -> bool:
@@ -76,73 +247,6 @@ def ensure_fraud_model_loaded() -> bool:
         )
 
     return fraud_detection_service.is_ready
-
-
-def ensure_business_model_loaded() -> bool:
-    global business_artifact
-    global business_model_mtime_ns
-
-    if not BUSINESS_MODEL_PATH.exists():
-        if business_artifact is not None:
-            print(
-                "WARNING: Business model file is temporarily unavailable. "
-                "Keeping the last successfully loaded model."
-            )
-            return True
-
-        return False
-
-    current_mtime_ns = (
-        BUSINESS_MODEL_PATH.stat().st_mtime_ns
-    )
-
-    if (
-        business_artifact is not None
-        and business_model_mtime_ns == current_mtime_ns
-    ):
-        return True
-
-    previous_artifact = business_artifact
-
-    try:
-        loaded_artifact = load_business_model()
-
-        if loaded_artifact is None:
-            return previous_artifact is not None
-
-        business_artifact = loaded_artifact
-        business_model_mtime_ns = current_mtime_ns
-
-        if previous_artifact is None:
-            print("Business fraud model loaded.")
-
-        else:
-            print(
-                "Business fraud model hot-reloaded. "
-                f"Version: "
-                f"{business_artifact.get('model_version', 'Unknown')}"
-            )
-
-        return True
-
-    except Exception as error:
-        if previous_artifact is not None:
-            print(
-                "WARNING: Failed to reload business fraud model. "
-                "Keeping the last successfully loaded model. "
-                f"Error: {error}"
-            )
-            return True
-
-        business_artifact = None
-        business_model_mtime_ns = None
-
-        print(
-            "ERROR: Failed to load business fraud model: "
-            f"{error}"
-        )
-
-        return False
 
 
 def get_model_version() -> str | None:

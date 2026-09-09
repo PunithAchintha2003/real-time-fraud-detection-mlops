@@ -1,20 +1,29 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:22-alpine AS deps
 
 WORKDIR /app
 
+ENV NPM_CONFIG_FETCH_RETRIES=5
+ENV NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+ENV NPM_CONFIG_FETCH_TIMEOUT=300000
+
 COPY apps/backend/package*.json ./
 
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    --prefer-offline \
+    --no-audit \
+    --no-fund
 
 
-FROM node:22-alpine AS builder
+FROM deps AS builder
 
 WORKDIR /app
 
 ENV DATABASE_URL="postgresql://fraud_user:fraud_password@backend-postgres:5432/fraud_auth_db?schema=public"
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY apps/backend/package*.json ./
 COPY apps/backend/nest-cli.json ./
 COPY apps/backend/tsconfig*.json ./
 COPY apps/backend/prisma ./prisma
@@ -25,6 +34,14 @@ RUN npm run prisma:generate
 RUN npm run build
 
 
+FROM deps AS prod-deps
+
+RUN npm prune \
+    --omit=dev \
+    --no-audit \
+    --no-fund
+
+
 FROM node:22-alpine AS runner
 
 WORKDIR /app
@@ -33,9 +50,7 @@ ENV NODE_ENV=production
 ENV PORT=4000
 
 COPY apps/backend/package*.json ./
-
-RUN npm ci --omit=dev
-
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/generated ./dist/generated
 
