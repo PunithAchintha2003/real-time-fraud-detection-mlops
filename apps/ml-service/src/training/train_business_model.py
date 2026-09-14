@@ -199,7 +199,7 @@ def generate_synthetic_business_data(
 
         fraud_probability = sigmoid(risk_signal)
 
-        label = int(rng.random() < fraud_probability)
+        label = int(fraud_probability >= 0.30)
 
         records.append(features)
         labels.append(label)

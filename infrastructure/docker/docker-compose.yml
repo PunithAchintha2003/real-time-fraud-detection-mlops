@@ -29,6 +29,7 @@ services:
       mlflow server
       --host 0.0.0.0
       --port 5000
+      --workers 1
       --allowed-hosts mlflow-server:5000,fraud-detection-mlflow:5000,localhost:*,127.0.0.1:*
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --serve-artifacts
@@ -39,7 +40,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 20s
+      start_period: 60s
 
   trainer:
     build:
@@ -125,7 +126,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 20s
+      start_period: 60s
 
   frontend:
     build:
@@ -152,7 +153,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 20s
+      start_period: 60s
 
 volumes:
   postgres-data:

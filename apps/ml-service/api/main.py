@@ -6,16 +6,22 @@ from time import perf_counter
 from typing import Any
 
 import joblib
+import mlflow
+from mlflow.tracking import MlflowClient
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.config import (
+    BUSINESS_FRAUD_THRESHOLD,
+    BUSINESS_MLFLOW_MODEL_ALIAS,
+    BUSINESS_MLFLOW_REGISTERED_MODEL_NAME,
     FEATURE_COLUMNS,
     FRAUD_THRESHOLD,
     MLFLOW_MODEL_ALIAS,
     MLFLOW_REGISTERED_MODEL_NAME,
+    MLFLOW_TRACKING_URI,
 )
 
 from src.features.business_features import (
