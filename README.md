@@ -20,6 +20,16 @@
 
 </p>
 
+<p align="center">
+
+### 🚀 Live Production Demo
+
+**[Open the Live Application](https://fraud-frontend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io)**
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Open%20Application-00C853?style=for-the-badge)](https://fraud-frontend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io)
+
+</p>
+
 A production-oriented, full-stack **MLOps platform for real-time fraud detection**, designed to demonstrate an end-to-end machine-learning production workflow.
 
 The platform combines a **Next.js frontend**, **NestJS backend**, **PostgreSQL**, **FastAPI machine-learning inference**, **MLflow experiment tracking and model registry**, **automated model retraining**, **Docker**, **Kubernetes**, **Prometheus/Grafana observability**, **GitHub Actions CI/CD**, and **Microsoft Azure cloud deployment**.
@@ -33,6 +43,7 @@ The project demonstrates how a machine-learning application can progress from **
 # Table of Contents
 
 - [Project Overview](#project-overview)
+- [Live Production Demo](#live-production-demo)
 - [Key Features](#key-features)
   - [Application](#application)
   - [Machine Learning](#machine-learning)
@@ -50,7 +61,7 @@ The project demonstrates how a machine-learning application can progress from **
 - [Repository Structure](#repository-structure)
 - [Technology Stack](#technology-stack)
   - [Frontend](#frontend)
-  - [Backend](#backend)
+  - [Backend](#backend-1)
   - [Machine Learning](#machine-learning-1)
   - [Containerization](#containerization)
   - [Orchestration](#orchestration)
@@ -60,6 +71,7 @@ The project demonstrates how a machine-learning application can progress from **
 - [Local Docker Environment](#local-docker-environment)
 - [Running the Local Full Stack](#running-the-local-full-stack)
 - [Local Application URLs](#local-application-urls)
+- [Azure Production URLs](#azure-production-urls)
 - [Health Checks](#health-checks)
 - [Observability](#observability-1)
   - [Prometheus Targets](#prometheus-targets)
@@ -69,7 +81,7 @@ The project demonstrates how a machine-learning application can progress from **
 - [GitHub Actions CI/CD](#github-actions-cicd)
 - [Testing](#testing)
 - [Local Development](#local-development)
-  - [Backend](#backend-1)
+  - [Backend](#backend-2)
   - [Frontend](#frontend-1)
   - [ML Service](#ml-service)
 - [Environment Configuration](#environment-configuration)
@@ -110,6 +122,29 @@ The platform provides a complete real-time fraud detection workflow:
 11. Docker and Kubernetes provide local and containerized deployment paths.
 12. GitHub Actions provides automated CI/CD validation and container image publishing.
 13. Azure Container Apps provides a cloud deployment architecture for the platform.
+
+---
+
+# Live Production Demo
+
+The platform is deployed to **Microsoft Azure Container Apps**.
+
+### Primary Application
+
+**[Launch the Real-Time Fraud Detection Platform](https://fraud-frontend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io)**
+
+### Production Services
+
+| Service | Production URL |
+|---|---|
+| Frontend | [Open Frontend](https://fraud-frontend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io) |
+| Backend API | [Open Backend API](https://fraud-backend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io) |
+| ML Service | [Open ML Service](https://fraud-ml-service.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io) |
+| ML Health | [Health Check](https://fraud-ml-service.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io/health) |
+| ML Metrics | [Metrics Endpoint](https://fraud-ml-service.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io/metrics) |
+| MLflow | Internal only |
+
+> **MLflow is intentionally kept internal and is not exposed through a public production URL.**
 
 ---
 
@@ -615,6 +650,23 @@ fraud-detection-grafana
 | MLflow | [http://localhost:5001](http://localhost:5001) |
 | Prometheus | [http://localhost:9090](http://localhost:9090) |
 | Grafana | [http://localhost:3001](http://localhost:3001) |
+
+---
+
+# Azure Production URLs
+
+The production environment is deployed using **Azure Container Apps**.
+
+| Service | Production URL |
+|---|---|
+| Frontend | [Open Frontend](https://fraud-frontend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io) |
+| Backend API | [Open Backend API](https://fraud-backend.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io) |
+| ML Service | [Open ML Service](https://fraud-ml-service.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io) |
+| ML Health | [Open ML Health](https://fraud-ml-service.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io/health) |
+| ML Metrics | [Open ML Metrics](https://fraud-ml-service.purpletree-0d9e53ac.uaenorth.azurecontainerapps.io/metrics) |
+| MLflow | Internal only |
+
+> **MLflow is intentionally kept internal and is not exposed through a public production URL.**
 
 ---
 
