@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { CheckCreditCardDto } from './dto/check-credit-card.dto';
 import { CheckTransactionDto } from './dto/check-transaction.dto';
 
 type BusinessPredictionResponse = {
@@ -88,6 +89,53 @@ export class TransactionsService {
       prediction_id: transaction.prediction?.id,
       ...prediction,
     };
+  }
+
+  async checkCreditCard(dto: CheckCreditCardDto) {
+    const mlServiceUrl =
+      this.configService.get<string>('ML_SERVICE_URL') ??
+      'http://localhost:8000';
+
+    let response: Response;
+
+    try {
+      response = await fetch(`${mlServiceUrl}/predict`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dto),
+      });
+    } catch {
+      throw new BadGatewayException(
+        'Cannot connect to ML prediction service',
+      );
+    }
+
+    if (!response.ok) {
+      let detail = 'ML credit card prediction request failed';
+
+      try {
+        const errorData = (await response.json()) as {
+          detail?: string;
+          message?: string | string[];
+        };
+
+        if (typeof errorData.detail === 'string') {
+          detail = errorData.detail;
+        } else if (typeof errorData.message === 'string') {
+          detail = errorData.message;
+        } else if (Array.isArray(errorData.message)) {
+          detail = errorData.message.join(', ');
+        }
+      } catch {
+        // Keep the default message.
+      }
+
+      throw new BadGatewayException(detail);
+    }
+
+    return response.json();
   }
 
   async findAll(userId: string) {

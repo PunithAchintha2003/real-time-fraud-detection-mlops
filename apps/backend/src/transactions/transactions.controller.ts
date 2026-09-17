@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CheckCreditCardDto } from './dto/check-credit-card.dto';
 import { CheckTransactionDto } from './dto/check-transaction.dto';
 import { TransactionsService } from './transactions.service';
 
@@ -33,6 +34,15 @@ export class TransactionsController {
     return this.transactionsService.checkTransaction(
       request.user.sub,
       checkTransactionDto,
+    );
+  }
+
+  @Post('check-credit-card')
+  checkCreditCard(
+    @Body() checkCreditCardDto: CheckCreditCardDto,
+  ) {
+    return this.transactionsService.checkCreditCard(
+      checkCreditCardDto,
     );
   }
 

@@ -152,13 +152,23 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="rounded-xl border border-slate-700 bg-slate-950/40 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-            >
-              Logout
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push("/credit-card-fraud")}
+                className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20"
+              >
+                Credit Card Fraud Detection
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="rounded-xl border border-slate-700 bg-slate-950/40 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+              >
+                Logout
+              </button>
+            </div>
           </div>
 
           <div className="mt-6">
